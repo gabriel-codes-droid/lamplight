@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { encode, decode } from './matcher.js';
-import { createTheatre, W, H } from './theatre.js';
+import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import { DEFAULT_SHAPES } from './shapes.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
@@ -13,16 +13,29 @@ const LAMP = new THREE.Vector3(0, 0.9, 0.7);   // low and behind the player
 const PPM = W / WALL_W;                        // canvas pixels per metre of wall
 
 const params = new URLSearchParams(location.search);
-const forceTeach = params.has('record');       // add ?record to re-teach every shape
 const threshold = parseFloat(params.get('th')) || 0.55; // ?th=0.5 makes matching easier
 
 // ---- shapes: built-in ones, overridden by ones taught on this device ----
+// A shape is a list of templates (hex strings). A plain string is accepted too.
+// ?record          re-teach every shape, replacing what was saved
+// ?record=bird,dog re-teach only those shapes, replacing them
+// ?add / ?add=bird teach one more template for every shape / those shapes, keeping the old ones
 const STORE = 'lamplight-shapes';
 let stored = {};
 try { stored = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { /* storage unavailable */ }
-const hexShapes = forceTeach ? {} : { ...DEFAULT_SHAPES, ...stored };
+const asList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : typeof v === 'string' ? [v] : []);
+const names = (key) => {                       // which shapes a ?key or ?key=a,b selects
+  if (!params.has(key)) return [];
+  const list = params.get(key).split(',').map((n) => n.trim()).filter((n) => SHAPE_NAMES.includes(n));
+  return list.length ? list : SHAPE_NAMES;
+};
+const hexShapes = {};
+for (const name of new Set([...Object.keys(DEFAULT_SHAPES), ...Object.keys(stored)]))
+  hexShapes[name] = asList(name in stored ? stored[name] : DEFAULT_SHAPES[name]);
+for (const name of names('record')) hexShapes[name] = [];
 const shapes = {};
-for (const [name, hex] of Object.entries(hexShapes)) shapes[name] = decode(hex);
+for (const [name, list] of Object.entries(hexShapes)) shapes[name] = list.map(decode);
+const teach = [...new Set([...names('record'), ...names('add')])];
 
 const exportBox = document.getElementById('export');
 function showExport() {
@@ -53,9 +66,9 @@ const sfx = {
 const canvas = document.createElement('canvas');
 canvas.width = W; canvas.height = H;
 const theatre = createTheatre({
-  ctx: canvas.getContext('2d'), shapes, forceTeach, threshold, sfx,
+  ctx: canvas.getContext('2d'), shapes, teach, threshold, sfx,
   onShapeSaved(name, mask) {
-    hexShapes[name] = encode(mask); stored[name] = hexShapes[name];
+    hexShapes[name] = [...(hexShapes[name] || []), encode(mask)]; stored[name] = hexShapes[name].slice();
     try { localStorage.setItem(STORE, JSON.stringify(stored)); } catch (e) { /* storage unavailable */ }
     showExport();
   },

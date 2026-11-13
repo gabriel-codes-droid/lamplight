@@ -1,7 +1,7 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
-import { N, rasterize, iou } from './matcher.js';
+import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
 export const W = 1024, H = 512;
 const INK = '#160c06', PAPER = '#e9c98b', GROUND = 430;
@@ -118,14 +118,20 @@ const SCENES = [
   },
 ];
 
-export function createTheatre({ ctx, shapes, forceTeach = false, threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
+export const SHAPE_NAMES = [...new Set(SCENES.map((sc) => sc.shape))];
+
+// shapes: { name: [mask, mask, ...] }. Several templates per shape are allowed;
+// teach: names to (re)teach this run, on top of any shape that has no template yet.
+export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
   const c = ctx;
+  const has = (n) => !!(shapes[n] && shapes[n].length);
+  for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
   const s = { phase: 'intro', i: 0, t: 0, hold: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
-  const toTeach = forceTeach ? SCENES.map((sc) => sc.shape) : [];
+  const toTeach = teach.slice();
 
   function begin() {
-    const missing = toTeach.shift() || SCENES.map((sc) => sc.shape).find((n) => !shapes[n]);
+    const missing = toTeach.shift() || SHAPE_NAMES.find((n) => !has(n));
     if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, ref: null, cooldown: 0 });
     else startScene(0);
   }
@@ -141,8 +147,10 @@ export function createTheatre({ ctx, shapes, forceTeach = false, threshold = 0.5
     sfx.chime && sfx.chime();
   }
   function saveTeach(mask, persist) {
-    shapes[s.teach] = mask;
-    if (persist) onShapeSaved(s.teach, mask);
+    const saved = mask.slice();
+    (shapes[s.teach] || (shapes[s.teach] = [])).push(saved);
+    variantsOf(saved);
+    if (persist) onShapeSaved(s.teach, saved);
     s.cooldown = 2.5; s.still = 0; s.ref = null;
     sfx.chime && sfx.chime();
   }
@@ -161,7 +169,7 @@ export function createTheatre({ ctx, shapes, forceTeach = false, threshold = 0.5
       else if (!s.ref || iou(s.mask, s.ref) < 0.78) { s.ref = s.mask; s.still = 0; }
       else { s.still += el; if (s.still >= TEACH_HOLD) saveTeach(s.mask, true); }
     } else if (s.phase === 'wait') {
-      s.score = iou(s.mask, shapes[SCENES[s.i].shape]);
+      s.score = bestMatch(s.mask, shapes[SCENES[s.i].shape]); s.angle = match.angle;
       s.hold = s.score >= threshold ? s.hold + el : Math.max(0, s.hold - el * 2);
       if (s.hold >= MATCH_HOLD) succeed();
     }
@@ -204,7 +212,7 @@ export function createTheatre({ ctx, shapes, forceTeach = false, threshold = 0.5
       ground(c);
       if (s.cooldown > 0) {
         text(`Saved: ${s.teach}`, 52);
-        drawMask(shapes[s.teach], W / 2, 240, 240, 'rgba(22,12,6,0.35)');
+        drawMask(shapes[s.teach][shapes[s.teach].length - 1], W / 2, 240, 240, 'rgba(22,12,6,0.35)');
       } else {
         text(`Teach the theatre a ${s.teach}.`, 46);
         text('Make the shape with your hands, then hold still.', 80, 20, 0.6);
@@ -226,13 +234,13 @@ export function createTheatre({ ctx, shapes, forceTeach = false, threshold = 0.5
       if (s.phase !== 'alive') {
         text(scene.prompt, 46, 28, s.phase === 'intro' ? clamp01(s.t / 1.2) * 0.8 : 0.8);
         // faint hint of the target shape; it darkens as the player gets close
-        drawMask(shapes[scene.shape], W / 2, 215, 230, `rgba(22,12,6,${0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD)})`);
+        drawMask(shapes[scene.shape][0], W / 2, 215, 230, `rgba(22,12,6,${0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD)})`);
       } else if (s.snap) {
         const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story
         c.save(); c.translate(cr[0], cr[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
         drawSegs(s.snap.segs); c.restore();
       } else {
-        drawMask(shapes[scene.shape], cr[0], cr[1], 110, INK);
+        drawMask(shapes[scene.shape][0], cr[0], cr[1], 110, INK);
       }
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow

@@ -41,6 +41,52 @@ export function iou(a, b) {
   return union ? inter / union : 0;
 }
 
+// ---- tilt-tolerant matching ----
+// Hands never hold a shape at exactly the angle it was taught. So each saved
+// template is also compared at -20..+20 degrees (5 degree steps) and the best
+// score wins. A shape can have several saved templates; the best of all counts.
+export const ANGLES = [-20, -15, -10, -5, 0, 5, 10, 15, 20];
+
+// Rotate a template: turn each filled cell into a small dot, rotate the dots,
+// then rasterize them again. rasterize() re-centres and re-scales, exactly as it
+// does for the live shadow, so a tilted shape is compared like with like.
+function rotated(mask, deg) {
+  const a = deg * Math.PI / 180, cs = Math.cos(a), sn = Math.sin(a), dots = [];
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (mask[y * N + x]) {
+    const px = x + 0.5 - N / 2, py = y + 0.5 - N / 2;
+    const rx = px * cs - py * sn, ry = px * sn + py * cs;
+    dots.push({ ax: rx, ay: ry, bx: rx, by: ry, r: 0.78 }); // 0.78 leaves no holes after rotating
+  }
+  return rasterize(dots) || mask;
+}
+
+const variantCache = new WeakMap();
+// All rotated versions of one template, in ANGLES order (0 degrees is the original).
+export function variantsOf(mask) {
+  let v = variantCache.get(mask);
+  if (!v) { v = ANGLES.map((d) => (d === 0 ? mask : rotated(mask, d))); variantCache.set(mask, v); }
+  return v;
+}
+
+// Where the last bestMatch() score came from: handy for tuning and the debug readout.
+export const match = { score: 0, angle: 0, template: 0 };
+
+// Best IoU of a live mask against every template (an array of masks) at every tilt.
+export function bestMatch(mask, templates) {
+  let best = 0, bestAngle = 0, bestTemplate = 0;
+  if (mask && templates) {
+    for (let t = 0; t < templates.length; t++) {
+      const v = variantsOf(templates[t]);
+      for (let a = 0; a < v.length; a++) {
+        const score = iou(mask, v[a]);
+        if (score > best) { best = score; bestAngle = ANGLES[a]; bestTemplate = t; }
+      }
+    }
+  }
+  match.score = best; match.angle = bestAngle; match.template = bestTemplate;
+  return best;
+}
+
 export function encode(mask) {
   let hex = '';
   for (let i = 0; i < mask.length; i += 4)
