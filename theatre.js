@@ -8,6 +8,7 @@ const INK = '#160c06', PAPER = '#e9c98b', GROUND = 430;
 const TEACH_HOLD = 2.5;   // seconds to hold still when teaching a shape
 const MATCH_HOLD = 0.6;   // seconds a match must last to count
 const TITLE_HOLD = 1;     // seconds both hands must stay tracked on the title scene
+const LOST_SHOW = 0.4;    // seconds without any hand before the "bring your hands back" message
 const ALIVE_TIME = 7;     // seconds of story animation per scene
 // Help when stuck: after HELP_AFTER seconds waiting for a shape the hint darkens, and
 // every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
@@ -130,7 +131,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
-  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, titleHold: 0, live: false, hands: 0, supported: true, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -177,6 +178,11 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
       if (s.titleHold >= TITLE_HOLD) begin();
       return;
     }
+    // Tracking loss: with no hand in view the hold, teach and stuck timers stand still
+    // (the story animation carries on), and the wall asks for the hands back.
+    s.lost = s.live && s.hands === 0 ? s.lost + dt : 0;
+    const needsHands = s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0);
+    const paused = needsHands && s.lost > 0;
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
     if (s.phase === 'intro' && s.t > 2.5) { s.phase = 'wait'; s.t = 0; }
     if (s.phase === 'alive' && s.t > ALIVE_TIME) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
@@ -184,6 +190,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     if (s.clock < 0.06) return;          // match about 16 times a second
     const el = s.clock; s.clock = 0;
     s.mask = rasterize(segs);
+    if (paused) return;
     if (s.phase === 'teach') {
       if (!s.mask) { s.ref = null; s.still = 0; }
       else if (!s.ref || iou(s.mask, s.ref) < 0.78) { s.ref = s.mask; s.still = 0; }
@@ -283,6 +290,10 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
       } else {
         drawMask(shapes[scene.shape][0], cr[0], cr[1], 110, INK);
       }
+    }
+    if (s.lost > LOST_SHOW && (s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0))) {
+      c.fillStyle = 'rgba(233,201,139,0.8)'; c.fillRect(0, 0, W, H);
+      text('Bring your hands back into view', H / 2, 44, 0.9);
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
   }
