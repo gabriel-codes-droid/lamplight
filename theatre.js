@@ -14,6 +14,14 @@ const ALIVE_TIME = 7;     // seconds of story animation per scene
 // every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
 const HELP_AFTER = 20, HELP_EVERY = 10, HELP_STEP = 0.03, HELP_FLOOR = 0.3;
 
+// Strings built once, so drawing doesn't create garbage every frame.
+const INK_A = Array.from({ length: 33 }, (_, i) => `rgba(22,12,6,${(i / 32).toFixed(3)})`);
+const inkA = (a) => INK_A[Math.round(Math.max(0, Math.min(1, a)) * 32)];   // ink at alpha a (steps of 1/32)
+const FLICK = Array.from({ length: 8 }, (_, i) => `rgba(255,236,170,${(i * 0.006).toFixed(3)})`);
+const FONTS = {};
+const fontOf = (size) => FONTS[size] || (FONTS[size] = `${size}px Georgia, serif`);
+const AMBIENT = 0.05;     // seconds: how often the wall repaints when only slow ambient motion changes
+
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const ramp = (p, a, b) => clamp01((p - a) / (b - a));
 const ease = (t) => t * t * (3 - 2 * t);
@@ -142,12 +150,13 @@ function gate(c, open, lift) {   // hinged at x = 527; open 0..1 swings it away,
 // creature(p, sx, sy): where the living shadow is, p = 0..1 through the scene.
 // draw(c, p, time, cr): backdrop and actors; cr is the creature position or null.
 const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
+const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
 const SCENES = [
   {
     shape: 'bird',
     prompt: 'Mira dropped her key across the river. Make a bird.',
     caption: 'The little bird drops the key into Mira\'s hands.',
-    creature: (p, sx, sy) => along([[0, sx, sy], [0.35, 800, 380], [0.8, 215, 360], [1, 420, -120]], p),
+    creature: flight([[0, 0, 0], [0.35, 800, 380], [0.8, 215, 360], [1, 420, -120]]),
     draw(c, p, time, cr) {
       ground(c); river(c, time); mira(c, 170, time);
       if (p < 0.35 || !cr) key(c, 800, GROUND - 14);
@@ -160,8 +169,9 @@ const SCENES = [
     prompt: 'A wolf blocks the path. Make a dog to chase it off.',
     caption: 'The wolf has never met a dog so brave.',
     creature: (p, sx, sy) => {
-      const [x, y] = along([[0, sx, sy], [0.4, 540, 385], [1, 600, 385]], p);
-      return [x + (p > 0.4 && p < 0.65 ? Math.sin(p * 220) * 7 : 0), y]; // barking
+      const r = dogRun(p, sx, sy);
+      if (p > 0.4 && p < 0.65) r[0] += Math.sin(p * 220) * 7; // barking
+      return r;
     },
     draw(c, p, time) {
       ground(c);
@@ -215,7 +225,7 @@ const SCENES = [
     shape: 'rabbit',
     prompt: 'A wall stands before home. Make a rabbit to dig under it.',
     caption: 'Under the wall and out of the dark.',
-    creature: (p, sx, sy) => along([[0, sx, sy], [0.35, 455, 395], [0.6, 520, 425], [0.8, 610, 395], [1, 640, 395]], p),
+    creature: flight([[0, 0, 0], [0.35, 455, 395], [0.6, 520, 425], [0.8, 610, 395], [1, 640, 395]]),
     draw(c, p, time) {
       ground(c); house(c, 860);
       c.fillStyle = INK; c.fillRect(498, 230, 44, 204);
@@ -234,13 +244,17 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
-  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
+  const maskBuf = new Uint8Array(N * N), refBuf = new Uint8Array(N * N);
+  const bgGrad = c.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.62);
+  bgGrad.addColorStop(0, 'rgb(246,220,163)'); bgGrad.addColorStop(0.6, '#d9a85e'); bgGrad.addColorStop(1, '#6b3d18');
+  const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
   function begin() {
     const missing = toTeach.shift() || SHAPE_NAMES.find((n) => !has(n));
-    if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, ref: null, cooldown: 0 });
+    if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, hasRef: false, cooldown: 0,
+      teachLine: `Teach the theatre a ${missing}.`, savedLine: `Saved: ${missing}` });
     else startScene(Math.min(start, SCENES.length - 1));
   }
   function startScene(i) { Object.assign(s, { phase: 'intro', i, t: 0, hold: 0, stuck: 0, snap: null }); }
@@ -269,7 +283,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     (shapes[s.teach] || (shapes[s.teach] = [])).push(saved);
     variantsOf(saved);
     if (persist) onShapeSaved(s.teach, saved);
-    s.cooldown = 2.5; s.still = 0; s.ref = null;
+    s.cooldown = 2.5; s.still = 0; s.hasRef = false;
     sfx.chime && sfx.chime();
   }
 
@@ -297,11 +311,11 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     if (s.phase === 'end' && s.t > 8) startScene(0);
     if (s.clock < 0.06) return;          // match about 16 times a second
     const el = s.clock; s.clock = 0;
-    s.mask = rasterize(segs);
+    s.mask = rasterize(segs, maskBuf);   // null when there is no shadow; otherwise maskBuf, reused
     if (paused) return;
     if (s.phase === 'teach') {
-      if (!s.mask) { s.ref = null; s.still = 0; }
-      else if (!s.ref || iou(s.mask, s.ref) < 0.78) { s.ref = s.mask; s.still = 0; }
+      if (!s.mask) { s.hasRef = false; s.still = 0; }
+      else if (!s.hasRef || iou(s.mask, refBuf) < 0.78) { refBuf.set(s.mask); s.hasRef = true; s.still = 0; }
       else { s.still += el; if (s.still >= TEACH_HOLD) saveTeach(s.mask, true); }
     } else if (s.phase === 'wait') {
       s.stuck += el;
@@ -329,20 +343,68 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   }
   function drawSegs(segs) {
     c.strokeStyle = INK; c.lineCap = 'round';
-    for (const g of segs) { c.lineWidth = g.r * 2; c.beginPath(); c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); c.stroke(); }
+    for (let i = 0; i < segs.length; i++) { const g = segs[i]; c.lineWidth = g.r * 2; c.beginPath(); c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); c.stroke(); }
   }
   function text(str, y, size = 28, alpha = 0.8) {
-    c.font = `${size}px Georgia, serif`; c.textAlign = 'center';
-    c.fillStyle = `rgba(22,12,6,${alpha})`; c.fillText(str, W / 2, y);
+    c.font = fontOf(size); c.textAlign = 'center';
+    c.fillStyle = inkA(alpha); c.fillText(str, W / 2, y);
   }
 
+  // A number that changes whenever something on the wall changes other than slow
+  // ambient motion and the player's shadow: the phase and the quantised progress bars.
+  const PHASES = ['title', 'teach', 'intro', 'wait', 'alive', 'end'];
+  let lastSig = NaN, lastPaint = -1;
+  function signature() {
+    let h = PHASES.indexOf(s.phase) * 1009 + s.i * 101 + s.hands * 11 + (s.supported === null ? 2 : s.supported ? 1 : 0);
+    h = h * 31 + Math.round(s.hold * 30);
+    h = h * 31 + Math.round(s.still * 10);
+    h = h * 31 + Math.round(s.titleHold * 10);
+    h = h * 31 + Math.round(ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) * 40);
+    h = h * 31 + (s.lost > LOST_SHOW ? 1 : 0) + (s.cooldown > 0 ? 2 : 0) + (s.live ? 4 : 0);
+    return h | 0;
+  }
+
+  // Has the player's shadow moved on the wall? Hand tracking always jitters a little,
+  // so only a move of about a pixel counts. painted[] holds what is on the wall now.
+  const MOVED = 0.75;
+  const painted = new Float32Array(1280);   // room for 256 segments
+  let paintedCount = 0;
+  function shadowMoved() {
+    const segs = s.segs;
+    if (segs.length !== paintedCount || segs.length * 5 > painted.length) return true;
+    for (let i = 0, k = 0; i < segs.length; i++, k += 5) {
+      const g = segs[i];
+      if (Math.abs(g.ax - painted[k]) > MOVED || Math.abs(g.ay - painted[k + 1]) > MOVED ||
+          Math.abs(g.bx - painted[k + 2]) > MOVED || Math.abs(g.by - painted[k + 3]) > MOVED ||
+          Math.abs(g.r - painted[k + 4]) > MOVED / 2) return true;
+    }
+    return false;
+  }
+  function rememberShadow() {
+    const segs = s.segs;
+    paintedCount = segs.length;
+    if (segs.length * 5 > painted.length) return;
+    for (let i = 0, k = 0; i < segs.length; i++, k += 5) {
+      const g = segs[i];
+      painted[k] = g.ax; painted[k + 1] = g.ay; painted[k + 2] = g.bx; painted[k + 3] = g.by; painted[k + 4] = g.r;
+    }
+  }
+
+  // Paints the wall if anything changed since last time. Returns true if it did, so
+  // the caller only re-uploads the texture then.
   function draw(time) {
+    const sig = signature();
+    const animating = s.phase === 'alive' || s.phase === 'intro' || s.phase === 'end';
+    if (!animating && sig === lastSig && time - lastPaint < AMBIENT && !shadowMoved()) return false;
+    lastSig = sig; lastPaint = time; rememberShadow();
+    paint(time);
+    return true;
+  }
+
+  function paint(time) {
     // lamp-lit paper wall, with a slow flicker
-    const flick = 0.97 + 0.03 * Math.sin(time * 7.3) * Math.sin(time * 2.1);
-    const g = c.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.62);
-    g.addColorStop(0, `rgba(${Math.round(250 * flick)},${Math.round(224 * flick)},${Math.round(166 * flick)},1)`);
-    g.addColorStop(0.6, '#d9a85e'); g.addColorStop(1, '#6b3d18');
-    c.globalAlpha = 1; c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.globalAlpha = 1; c.fillStyle = bgGrad; c.fillRect(0, 0, W, H);
+    c.fillStyle = FLICK[Math.round((1 + Math.sin(time * 7.3) * Math.sin(time * 2.1)) * 3.5)]; c.fillRect(0, 0, W, H);
 
     const scene = SCENES[s.i];
     if (s.phase === 'title') {
@@ -364,10 +426,10 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     } else if (s.phase === 'teach') {
       ground(c);
       if (s.cooldown > 0) {
-        text(`Saved: ${s.teach}`, 52);
+        text(s.savedLine, 52);
         drawMask(shapes[s.teach][shapes[s.teach].length - 1], W / 2, 240, 240, 'rgba(22,12,6,0.35)');
       } else {
-        text(`Teach the theatre a ${s.teach}.`, 46);
+        text(s.teachLine, 46);
         text('Make the shape with your hands, then hold still.', 80, 20, 0.6);
         c.strokeStyle = 'rgba(22,12,6,0.6)'; c.lineWidth = 6; c.lineCap = 'round';
         c.beginPath(); c.arc(W - 60, 60, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp01(s.still / TEACH_HOLD)); c.stroke();
@@ -391,7 +453,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         // faint hint of the target shape; it darkens as the player gets close,
         // and again when they have been stuck for a while
         const help = s.phase === 'wait' ? ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) : 0;
-        drawMask(shapes[scene.shape][0], W / 2, 215, 230, `rgba(22,12,6,${0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD) + 0.22 * help})`);
+        drawMask(shapes[scene.shape][0], W / 2, 215, 230, inkA(0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD) + 0.22 * help));
         if (help > 0) text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
       } else if (s.snap) {
         const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story

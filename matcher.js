@@ -4,10 +4,12 @@
 // shadow is, and compare two grids by overlap (intersection over union).
 export const N = 32;
 
-export function rasterize(segs) {
+// Pass `out` (a Uint8Array of N*N) to reuse a buffer instead of allocating one.
+export function rasterize(segs, out) {
   if (!segs || !segs.length) return null;
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const s of segs) {
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
     x0 = Math.min(x0, s.ax - s.r, s.bx - s.r); x1 = Math.max(x1, s.ax + s.r, s.bx + s.r);
     y0 = Math.min(y0, s.ay - s.r, s.by - s.r); y1 = Math.max(y1, s.ay + s.r, s.by + s.r);
   }
@@ -15,8 +17,10 @@ export function rasterize(segs) {
   if (!(span > 0)) return null;
   const k = (N - 2) / span;
   const ox = (N - (x1 - x0) * k) / 2, oy = (N - (y1 - y0) * k) / 2;
-  const m = new Uint8Array(N * N);
-  for (const s of segs) {
+  const m = out || new Uint8Array(N * N);
+  if (out) m.fill(0);
+  for (let i = 0; i < segs.length; i++) {
+    const s = segs[i];
     const ax = (s.ax - x0) * k + ox, ay = (s.ay - y0) * k + oy;
     const bx = (s.bx - x0) * k + ox, by = (s.by - y0) * k + oy;
     const r = Math.max(0.5, s.r * k), r2 = r * r;

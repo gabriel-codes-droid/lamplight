@@ -85,6 +85,11 @@ renderer.xr.addEventListener('sessionstart', () => {
   const features = renderer.xr.getSession().enabledFeatures;   // missing on some browsers: then we find out below
   input.supported = features ? features.includes('hand-tracking') : null;
   xrStart = performance.now(); seenHands = false;
+  try {                                                         // ask for 72 fps, the Quest 3 default we are tuned for
+    const session = renderer.xr.getSession();
+    if (session.updateTargetFrameRate && session.supportedFrameRates && Array.from(session.supportedFrameRates).includes(72))
+      session.updateTargetFrameRate(72).catch(() => {});
+  } catch (e) { /* not supported */ }
 });
 
 const scene = new THREE.Scene();
@@ -98,6 +103,8 @@ addEventListener('resize', () => {
 
 const wallTex = new THREE.CanvasTexture(canvas);
 wallTex.colorSpace = THREE.SRGBColorSpace;
+wallTex.generateMipmaps = false;               // the wall is re-uploaded often: skip rebuilding mipmaps each time
+wallTex.minFilter = THREE.LinearFilter;
 const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, WALL_H), new THREE.MeshBasicMaterial({ map: wallTex }));
 wall.position.set(0, WALL_Y, WALL_Z);
 scene.add(wall);
@@ -163,8 +170,7 @@ renderer.setAnimationLoop(() => {
     input.live = false; input.hands = 0; segs.length = 0;
   }
   theatre.update(dt, segs, input);
-  theatre.draw(now);
-  wallTex.needsUpdate = true;
+  if (theatre.draw(now)) wallTex.needsUpdate = true;   // only re-upload the wall when it was repainted
   renderer.render(scene, camera);
 
   hudFrames++;
