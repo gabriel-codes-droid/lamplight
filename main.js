@@ -81,7 +81,15 @@ renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
 document.body.appendChild(VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] }));
-renderer.xr.addEventListener('sessionstart', wake);
+// What the theatre needs to know about the hands (see update() in theatre.js).
+const input = { live: false, hands: 0, supported: true };
+let xrStart = 0, seenHands = false;
+renderer.xr.addEventListener('sessionstart', () => {
+  wake();
+  const features = renderer.xr.getSession().enabledFeatures;   // missing on some browsers: then we find out below
+  input.supported = features ? features.includes('hand-tracking') : null;
+  xrStart = performance.now(); seenHands = false;
+});
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b0705);
@@ -143,12 +151,14 @@ function bone(a, b, radius) {
   if (pa && pb) segs.push({ ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y, r: radius * (pa.k + pb.k) / 2 });
 }
 const tmp = new THREE.Vector3();
-function collectShadow() {
+function collectShadow() {          // returns how many hands are tracked
   segs.length = 0;
-  if (!renderer.xr.isPresenting) return;
+  let tracked = 0;
+  if (!renderer.xr.isPresenting) return tracked;
   for (const hand of hands) {
     const J = hand.joints, wrist = J && J['wrist'];
-    if (!hand.visible || !wrist) continue;
+    if (!hand.visible || !wrist || wrist.visible === false) continue;
+    tracked++;
     for (const chain of FINGERS) {
       let prev = wrist;
       chain.forEach((name, i) => {
@@ -168,6 +178,7 @@ function collectShadow() {
       bone(wrist.position, tmp, 0.027);
     }
   }
+  return tracked;
 }
 
 addEventListener('keydown', (e) => { if (e.code === 'Space') theatre.skip(); });
@@ -175,8 +186,11 @@ addEventListener('keydown', (e) => { if (e.code === 'Space') theatre.skip(); });
 const clock = new THREE.Clock();
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  collectShadow();
-  theatre.update(dt, segs);
+  input.live = renderer.xr.isPresenting;
+  input.hands = collectShadow();
+  if (input.hands > 0) { seenHands = true; input.supported = true; }
+  else if (input.live && input.supported === null && !seenHands && performance.now() - xrStart > 8000) input.supported = false;
+  theatre.update(dt, segs, input);
   theatre.draw(clock.elapsedTime);
   wallTex.needsUpdate = true;
   renderer.render(scene, camera);

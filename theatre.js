@@ -7,6 +7,7 @@ export const W = 1024, H = 512;
 const INK = '#160c06', PAPER = '#e9c98b', GROUND = 430;
 const TEACH_HOLD = 2.5;   // seconds to hold still when teaching a shape
 const MATCH_HOLD = 0.6;   // seconds a match must last to count
+const TITLE_HOLD = 1;     // seconds both hands must stay tracked on the title scene
 const ALIVE_TIME = 7;     // seconds of story animation per scene
 // Help when stuck: after HELP_AFTER seconds waiting for a shape the hint darkens, and
 // every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
@@ -129,7 +130,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
-  const s = { phase: 'intro', i: 0, t: 0, hold: 0, stuck: 0, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, titleHold: 0, live: false, hands: 0, supported: true, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -166,8 +167,16 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     sfx.chime && sfx.chime();
   }
 
-  function update(dt, segs) {
+  // input (from main.js): { live: a headset or replay is driving the hands,
+  //   hands: how many hands are tracked right now, supported: hand tracking is available (null = not known yet) }
+  function update(dt, segs, input) {
     s.t += dt; s.clock += dt; s.segs = segs;
+    s.live = !!(input && input.live); s.hands = s.live ? input.hands : 0; s.supported = input ? input.supported : true;
+    if (s.phase === 'title') {      // the story starts once both hands have been seen for a moment
+      s.titleHold = s.live && s.hands >= 2 ? s.titleHold + dt : Math.max(0, s.titleHold - dt * 2);
+      if (s.titleHold >= TITLE_HOLD) begin();
+      return;
+    }
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
     if (s.phase === 'intro' && s.t > 2.5) { s.phase = 'wait'; s.t = 0; }
     if (s.phase === 'alive' && s.t > ALIVE_TIME) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
@@ -189,7 +198,8 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
 
   // Desktop preview / debugging: pass the current step without hands.
   function skip() {
-    if (s.phase === 'teach' && s.cooldown <= 0) saveTeach(rasterize([{ ax: 0, ay: 0, bx: 10, by: 4, r: 4 }]), false);
+    if (s.phase === 'title') begin();
+    else if (s.phase === 'teach' && s.cooldown <= 0) saveTeach(rasterize([{ ax: 0, ay: 0, bx: 10, by: 4, r: 4 }]), false);
     else if (s.phase === 'wait' || s.phase === 'intro') succeed();
   }
 
@@ -220,7 +230,23 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     c.globalAlpha = 1; c.fillStyle = g; c.fillRect(0, 0, W, H);
 
     const scene = SCENES[s.i];
-    if (s.phase === 'teach') {
+    if (s.phase === 'title') {
+      ground(c);
+      text('Lamplight', 120, 64, 0.9);
+      text('Put your controllers down and hold up your hands.', 190, 30, 0.85);
+      if (s.live && s.supported === false) {
+        text('This session has no hand tracking.', 290, 30, 0.9);
+        text('Turn on Hand Tracking in your headset settings, then enter VR again.', 330, 22, 0.8);
+      } else if (!s.live) {
+        text('No headset? Press Space to begin.', 300, 22, 0.6);
+      } else {
+        text(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 300, 24, 0.7);
+        for (let h = 0; h < 2; h++) {   // one dot per hand seen
+          c.fillStyle = h < s.hands ? INK : 'rgba(22,12,6,0.18)';
+          c.beginPath(); c.arc(W / 2 + (h ? 36 : -36), 360, 16, 0, 7); c.fill();
+        }
+      }
+    } else if (s.phase === 'teach') {
       ground(c);
       if (s.cooldown > 0) {
         text(`Saved: ${s.teach}`, 52);
@@ -261,6 +287,5 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
   }
 
-  begin();
   return { update, draw, skip, state: s, threshold: currentThreshold };
 }
