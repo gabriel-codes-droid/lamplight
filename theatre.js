@@ -18,17 +18,24 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const ramp = (p, a, b) => clamp01((p - a) / (b - a));
 const ease = (t) => t * t * (3 - 2 * t);
 
+const AT = [0, 0]; // along() writes here: read it right away, don't keep it
 function along(pts, p) { // pts: [[time, x, y], ...]
-  if (p <= pts[0][0]) return [pts[0][1], pts[0][2]];
+  if (p <= pts[0][0]) { AT[0] = pts[0][1]; AT[1] = pts[0][2]; return AT; }
   for (let i = 1; i < pts.length; i++) {
     if (p <= pts[i][0]) {
-      const [t0, xa, ya] = pts[i - 1], [t1, xb, yb] = pts[i];
-      const k = ease((p - t0) / (t1 - t0));
-      return [xa + (xb - xa) * k, ya + (yb - ya) * k];
+      const a = pts[i - 1], b = pts[i];
+      const k = ease((p - a[0]) / (b[0] - a[0]));
+      AT[0] = a[1] + (b[1] - a[1]) * k; AT[1] = a[2] + (b[2] - a[2]) * k;
+      return AT;
     }
   }
   const l = pts[pts.length - 1];
-  return [l[1], l[2]];
+  AT[0] = l[1]; AT[1] = l[2];
+  return AT;
+}
+// A creature path: the first point is wherever the player's shadow was, the rest are fixed.
+function flight(pts) {
+  return (p, sx, sy) => { pts[0][1] = sx; pts[0][2] = sy; return along(pts, p); };
 }
 
 // ---------- shadow-puppet props ----------
@@ -81,13 +88,65 @@ function house(c, x) {
   c.fillStyle = '#ffdf9a'; c.fillRect(x + 8, y - 60, 26, 26); // lit window
 }
 
+function moon(c) {
+  c.strokeStyle = INK; c.lineWidth = 9; c.lineCap = 'round';
+  c.beginPath(); c.arc(930, 110, 24, Math.PI * 0.7, Math.PI * 1.8); c.stroke();
+}
+function pine(c, x, h) {
+  c.fillStyle = INK;
+  c.fillRect(x - 5, GROUND - h * 0.2, 10, h * 0.22);
+  for (let i = 0; i < 3; i++) {
+    const w = h * 0.3 * (1 - i * 0.2), base = GROUND - h * 0.14 - i * h * 0.26;
+    c.beginPath(); c.moveTo(x - w, base); c.lineTo(x, base - h * 0.42); c.lineTo(x + w, base); c.fill();
+  }
+}
+function bareTree(c, x) {       // trunk with one long branch to the right
+  c.fillStyle = INK; c.fillRect(x - 8, GROUND - 240, 16, 242);
+  c.strokeStyle = INK; c.lineWidth = 8; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x, GROUND - 180); c.quadraticCurveTo(x + 50, GROUND - 235, x + 120, GROUND - 222); c.stroke();
+}
+function lantern(c, x, y, glow, chain) { // x, y = centre of the glass
+  if (chain) { c.strokeStyle = INK; c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(x, y - 36); c.lineTo(x, y - 14); c.stroke(); }
+  c.fillStyle = INK; c.fillRect(x - 11, y - 14, 22, 5); c.fillRect(x - 11, y + 9, 22, 5);
+  c.fillStyle = glow ? '#ffdf9a' : PAPER; c.fillRect(x - 8, y - 9, 16, 18);
+  c.fillStyle = INK; c.fillRect(x - 1, y - 9, 2, 18);
+}
+function sheep(c, x, y) {       // faces right; y is where the hooves touch
+  c.fillStyle = INK;
+  c.beginPath(); c.ellipse(x, y - 26, 25, 18, 0, 0, 7); c.fill();                 // fleece
+  c.beginPath(); c.arc(x + 27, y - 32, 9, 0, 7); c.fill();                        // head
+  c.beginPath(); c.moveTo(x + 24, y - 38); c.lineTo(x + 18, y - 48); c.lineTo(x + 31, y - 40); c.fill(); // ear
+  c.fillRect(x - 14, y - 12, 5, 13); c.fillRect(x + 9, y - 12, 5, 13);
+}
+function pen(c, x0, x1) {
+  c.fillStyle = INK;
+  c.fillRect(x0, GROUND - 56, x1 - x0, 5); c.fillRect(x0, GROUND - 28, x1 - x0, 5);
+  for (let x = x0; x <= x1; x += 68) c.fillRect(x - 4, GROUND - 68, 8, 70);
+}
+function rails(c, x0, x1) {
+  c.fillStyle = INK;
+  c.fillRect(x0, GROUND - 78, x1 - x0, 5); c.fillRect(x0, GROUND - 42, x1 - x0, 5);
+  for (let x = x0; x <= x1; x += 56) c.fillRect(x - 4, GROUND - 90, 8, 92);
+}
+function gate(c, open, lift) {   // hinged at x = 527; open 0..1 swings it away, lift 0..1 raises the latch
+  c.fillStyle = INK;
+  c.fillRect(515, GROUND - 112, 12, 114); c.fillRect(644, GROUND - 112, 12, 114); // posts
+  c.save(); c.translate(527, 0); c.scale(1 - 0.85 * open, 1); c.translate(-527, 0);
+  c.fillRect(527, GROUND - 92, 117, 5); c.fillRect(527, GROUND - 40, 117, 5);
+  for (let x = 533; x <= 640; x += 15) c.fillRect(x - 2, GROUND - 96, 4, 96);
+  c.restore();
+  c.save(); c.translate(644, GROUND - 66); c.rotate(-1.1 * lift); c.fillRect(-22, -3, 24, 6); c.restore(); // latch
+}
+
 // ---------- the story ----------
 // creature(p, sx, sy): where the living shadow is, p = 0..1 through the scene.
 // draw(c, p, time, cr): backdrop and actors; cr is the creature position or null.
+const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
 const SCENES = [
   {
     shape: 'bird',
     prompt: 'Mira dropped her key across the river. Make a bird.',
+    caption: 'The little bird drops the key into Mira\'s hands.',
     creature: (p, sx, sy) => along([[0, sx, sy], [0.35, 800, 380], [0.8, 215, 360], [1, 420, -120]], p),
     draw(c, p, time, cr) {
       ground(c); river(c, time); mira(c, 170, time);
@@ -99,6 +158,7 @@ const SCENES = [
   {
     shape: 'dog',
     prompt: 'A wolf blocks the path. Make a dog to chase it off.',
+    caption: 'The wolf has never met a dog so brave.',
     creature: (p, sx, sy) => {
       const [x, y] = along([[0, sx, sy], [0.4, 540, 385], [1, 600, 385]], p);
       return [x + (p > 0.4 && p < 0.65 ? Math.sin(p * 220) * 7 : 0), y]; // barking
@@ -110,8 +170,51 @@ const SCENES = [
     },
   },
   {
+    shape: 'bird', alive: 10,
+    prompt: 'Night in the pines. A lantern hangs too high. Make a bird.',
+    caption: 'The lantern swings down. The pines hold their breath.',
+    creature: flight([[0, 0, 0], [0.4, 722, 192], [0.85, 252, 330], [1, 330, -120]]),
+    draw(c, p, time, cr) {
+      ground(c); moon(c);
+      pine(c, 400, 250); pine(c, 470, 300); pine(c, 880, 280); pine(c, 960, 220);
+      bareTree(c, 600); mira(c, 170, time);
+      if (p < 0.4 || !cr) lantern(c, 722, 258, true, true);       // still on the branch
+      else if (p < 0.85) lantern(c, cr[0], cr[1] + 80, true, true); // carried
+      else {                                                         // in Mira's hand, glowing
+        c.fillStyle = 'rgba(255,238,180,0.5)'; c.beginPath(); c.arc(206, GROUND - 40, 90 * ease(ramp(p, 0.85, 1)), 0, 7); c.fill();
+        lantern(c, 206, GROUND - 40, true, false);
+      }
+    },
+  },
+  {
+    shape: 'dog', alive: 10,
+    prompt: 'Sheep crowd the lane. Make a dog to herd them to the pen.',
+    caption: 'Round they go, the whole woolly flock.',
+    creature: flight([[0, 0, 0], [0.25, 330, 388], [0.55, 560, 388], [0.85, 720, 388], [1, 760, 388]]),
+    draw(c, p, time) {
+      ground(c); mira(c, 170, time); pen(c, 795, 1000);
+      for (let i = 0; i < 4; i++) {
+        const k = ease(ramp(p, 0.3 + i * 0.06, 0.78 + i * 0.04));
+        const hop = k > 0 && k < 1 ? Math.abs(Math.sin(time * 9 + i * 1.7)) * 8 : 0;
+        sheep(c, SHEEP_FROM[i] + (SHEEP_TO[i] - SHEEP_FROM[i]) * k, GROUND - hop);
+      }
+    },
+  },
+  {
+    shape: 'rabbit', alive: 10,
+    prompt: 'The gate is latched from the far side. Make a rabbit.',
+    caption: 'The latch lifts and the gate sighs open.',
+    creature: flight([[0, 0, 0], [0.3, 440, 395], [0.55, 585, 396], [0.72, 668, 342], [0.8, 670, 342], [1, 700, 396]]),
+    draw(c, p, time) {
+      ground(c); rails(c, 330, 515); rails(c, 656, 780);
+      gate(c, ease(ramp(p, 0.8, 0.95)), ease(ramp(p, 0.74, 0.8)));
+      mira(c, 170 + ease(ramp(p, 0.85, 1)) * 560, time);
+    },
+  },
+  {
     shape: 'rabbit',
     prompt: 'A wall stands before home. Make a rabbit to dig under it.',
+    caption: 'Under the wall and out of the dark.',
     creature: (p, sx, sy) => along([[0, sx, sy], [0.35, 455, 395], [0.6, 520, 425], [0.8, 610, 395], [1, 640, 395]], p),
     draw(c, p, time) {
       ground(c); house(c, 860);
@@ -185,7 +288,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     const paused = needsHands && s.lost > 0;
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
     if (s.phase === 'intro' && s.t > 2.5) { s.phase = 'wait'; s.t = 0; }
-    if (s.phase === 'alive' && s.t > ALIVE_TIME) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
+    if (s.phase === 'alive' && s.t > (SCENES[s.i].alive || ALIVE_TIME)) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
     if (s.phase === 'end' && s.t > 8) startScene(0);
     if (s.clock < 0.06) return;          // match about 16 times a second
     const el = s.clock; s.clock = 0;
@@ -268,7 +371,8 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
       ground(c); house(c, 860); mira(c, 800, time);
       text('Home. The lamp can rest.', 200, 40, clamp01(s.t / 2) * 0.85);
     } else {
-      const p = s.phase === 'alive' ? clamp01(s.t / ALIVE_TIME) : 0;
+      const dur = scene.alive || ALIVE_TIME;
+      const p = s.phase === 'alive' ? clamp01(s.t / dur) : 0;
       let cr = null;
       if (s.phase === 'alive') {
         const sx = s.snap ? s.snap.cx : W / 2, sy = s.snap ? s.snap.cy : 220;
@@ -276,6 +380,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
         cr[1] += Math.sin(s.t * 9) * 5;
       }
       scene.draw(c, p, time, cr);
+      if (s.phase === 'alive') text(scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
       if (s.phase !== 'alive') {
         text(scene.prompt, 46, 28, s.phase === 'intro' ? clamp01(s.t / 1.2) * 0.8 : 0.8);
         // faint hint of the target shape; it darkens as the player gets close,
