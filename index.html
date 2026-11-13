@@ -5,13 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lamplight</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #0b0705; color: #e9c98b; font-family: Georgia, serif; overflow: hidden; }
-  #panel { position: fixed; top: 12px; left: 12px; max-width: 360px; background: rgba(11,7,5,.8); padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
-  #panel h1 { margin: 0 0 6px; font-size: 20px; }
-  details { margin-top: 8px; }
-  textarea { width: 100%; height: 110px; background: #160c06; color: #e9c98b; border: 1px solid #6b3d18; font: 11px monospace; }
-  pre#debug { margin: 8px 0 0; font: 12px monospace; white-space: pre-wrap; color: #f3dca8; }
-  button#copy, button#dl { margin-top: 6px; background: #e9c98b; border: 0; border-radius: 6px; padding: 6px 12px; font-family: inherit; }
+  /* Horizon OS style: dark glass panels, big rounded corners, pill buttons, white text. */
+  :root {
+    --glass: rgba(24, 26, 30, 0.86);
+    --glass-edge: rgba(255, 255, 255, 0.10);
+    --text: #f5f6f7;
+    --text-dim: #b8bcc2;
+    --blue: #0064e0;
+    --blue-hover: #1a78f0;
+    --chip: rgba(255, 255, 255, 0.12);
+    --chip-hover: rgba(255, 255, 255, 0.20);
+    --lamp: #f3d9a4;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b0705; color: var(--text); overflow: hidden;
+    font-family: "Optimistic Display", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+  #panel { position: fixed; top: 20px; left: 20px; width: min(400px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow: auto;
+    padding: 24px; border-radius: 28px; background: var(--glass); border: 1px solid var(--glass-edge);
+    -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
+  #panel h1 { margin: 0; font: 600 34px/1.1 Georgia, serif; color: var(--lamp); letter-spacing: 0.01em; }
+  .tagline { margin: 8px 0 20px; font-size: 16px; line-height: 1.45; color: var(--text-dim); }
+
+  ol.steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 12px; counter-reset: s; }
+  ol.steps li { counter-increment: s; display: flex; gap: 14px; align-items: flex-start; font-size: 16px; line-height: 1.4; }
+  ol.steps li::before { content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--chip);
+    display: grid; place-items: center; font-size: 14px; font-weight: 600; margin-top: 1px; }
+
+  /* the three.js VR button, restyled and moved here by main.js */
+  #enter { display: block; }
+  #enter button, button.pill { display: block; width: 100%; min-height: 52px; padding: 0 24px; border: 0; border-radius: 999px;
+    background: var(--blue); color: #fff; font-weight: 600; font-size: 17px; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  #VRButton { position: static !important; width: 100% !important; left: auto !important; bottom: auto !important; transform: none !important;
+    min-height: 56px; border: 0 !important; border-radius: 999px !important; background: var(--blue) !important; color: #fff !important;
+    font-weight: 600 !important; font-size: 17px !important; font-family: inherit !important; letter-spacing: 0.04em; opacity: 1 !important; padding: 0 24px !important; }
+  #VRButton:hover, button.pill:hover { background: var(--blue-hover) !important; }
+  #VRButton[style*="cursor: auto"], #VRButton:disabled, #VRButton[disabled] { background: var(--chip) !important; color: var(--text-dim) !important; cursor: default; }
+  button.chip { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--chip); color: var(--text);
+    font-weight: 600; font-size: 15px; font-family: inherit; cursor: pointer; transition: background 0.15s; }
+  button.chip:hover { background: var(--chip-hover); }
+  button:focus-visible, summary:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+  .hint { margin: 14px 0 0; font-size: 14px; color: var(--text-dim); text-align: center; }
+  details { margin-top: 18px; border-top: 1px solid var(--glass-edge); padding-top: 14px; }
+  summary { cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; padding: 6px 0; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; color: var(--text-dim); }
+  details[open] summary::after { content: "\2212"; }
+  details p { margin: 6px 0 10px; font-size: 14px; line-height: 1.45; color: var(--text-dim); }
+  textarea { width: 100%; height: 120px; padding: 12px; border-radius: 16px; border: 1px solid var(--glass-edge); resize: vertical;
+    background: rgba(0, 0, 0, 0.35); color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace; }
+  pre#debug { margin: 14px 0 0; padding: 12px 14px; border-radius: 16px; background: rgba(0, 0, 0, 0.35);
+    font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: #cfe3ff; }
+  #dl { margin-top: 12px; width: 100%; }
+  [hidden] { display: none !important; }
 </style>
 <script type="importmap">
 { "imports": {
@@ -21,18 +68,25 @@
 </script>
 </head>
 <body>
-<div id="panel">
+<main id="panel">
   <h1>Lamplight</h1>
-  A shadow-puppet story you play with your bare hands. Sit down, enter VR, and put your controllers away.
-  <br><small>No headset? Press Space to step through the story.</small>
+  <p class="tagline">A shadow-puppet story you play with your bare hands. Sit down, and let the lamp do the rest.</p>
+  <ol class="steps">
+    <li><span>Turn on <b>Hand Tracking</b> in your Quest settings.</span></li>
+    <li><span>Put your controllers down.</span></li>
+    <li><span>Enter VR and hold up both hands.</span></li>
+  </ol>
+  <div id="enter"></div>
+  <p class="hint">No headset? Press Space to step through the story.</p>
   <details>
-    <summary>Export shapes</summary>
-    <textarea id="export" readonly></textarea>
-    <button id="copy">Copy</button>
+    <summary>Shapes</summary>
+    <p>Shapes you teach are saved on this device. Copy this text into <code>shapes.js</code> to ship them to everyone.</p>
+    <textarea id="export" readonly aria-label="Exported shapes"></textarea>
+    <button id="copy" class="chip" style="margin-top:10px">Copy</button>
   </details>
   <pre id="debug" hidden></pre>
-  <button id="dl" hidden>Download capture</button>
-</div>
+  <button id="dl" class="chip" hidden>Download capture</button>
+</main>
 <script type="module" src="./main.js"></script>
 </body>
 </html>

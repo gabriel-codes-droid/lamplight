@@ -346,6 +346,15 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     c.strokeStyle = INK; c.lineCap = 'round';
     for (let i = 0; i < segs.length; i++) { const g = segs[i]; c.lineWidth = g.r * 2; c.beginPath(); c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); c.stroke(); }
   }
+  // Horizon-style system UI on the wall: dark glass panels with white text.
+  function glass(x, y, w, h, r) {
+    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath();
+    if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
+    c.fill(); c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
+  }
+  function textOn(str, y, size, color) {
+    c.font = fontOf(size); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
+  }
   function text(str, y, size = 28, alpha = 0.8) {
     c.font = fontOf(size); c.textAlign = 'center';
     c.fillStyle = inkA(alpha); c.fillText(str, W / 2, y);
@@ -410,18 +419,19 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     const scene = SCENES[s.i];
     if (s.phase === 'title') {
       ground(c);
-      text('Lamplight', 120, 64, 0.9);
-      text('Put your controllers down and hold up your hands.', 190, 30, 0.85);
+      glass(112, 44, 800, 356, 40);
+      textOn('Lamplight', 130, 60, '#f3d9a4');
+      textOn('Put your controllers down and hold up your hands.', 200, 32, '#f5f6f7');
       if (s.live && s.supported === false) {
-        text('This session has no hand tracking.', 290, 30, 0.9);
-        text('Turn on Hand Tracking in your headset settings, then enter VR again.', 330, 22, 0.8);
+        textOn('This session has no hand tracking.', 280, 32, '#ffb4a8');
+        textOn('Turn on Hand Tracking in your headset settings, then enter VR again.', 326, 24, '#b8bcc2');
       } else if (!s.live) {
-        text('No headset? Press Space to begin.', 300, 22, 0.6);
+        textOn('No headset? Press Space to begin.', 300, 24, '#b8bcc2');
       } else {
-        text(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 300, 24, 0.7);
+        textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 26, '#b8bcc2');
         for (let h = 0; h < 2; h++) {   // one dot per hand seen
-          c.fillStyle = h < s.hands ? INK : 'rgba(22,12,6,0.18)';
-          c.beginPath(); c.arc(W / 2 + (h ? 36 : -36), 360, 16, 0, 7); c.fill();
+          c.fillStyle = h < s.hands ? '#2d88ff' : 'rgba(255,255,255,0.2)';
+          c.beginPath(); c.arc(W / 2 + (h ? 36 : -36), 350, 16, 0, 7); c.fill();
         }
       }
     } else if (s.phase === 'teach') {
@@ -465,8 +475,9 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
       }
     }
     if (s.lost > LOST_SHOW && (s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0))) {
-      c.fillStyle = 'rgba(233,201,139,0.8)'; c.fillRect(0, 0, W, H);
-      text('Bring your hands back into view', H / 2, 44, 0.9);
+      c.fillStyle = 'rgba(11,7,5,0.4)'; c.fillRect(0, 0, W, H);
+      glass(172, H / 2 - 70, 680, 140, 70);
+      textOn('Bring your hands back into view', H / 2 + 14, 40, '#f5f6f7');
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
   }

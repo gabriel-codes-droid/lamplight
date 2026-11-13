@@ -76,7 +76,7 @@ renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
-document.body.appendChild(VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] }));
+(document.getElementById('enter') || document.body).appendChild(VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] })); // styled in index.html
 // What the theatre needs to know about the hands (see update() in theatre.js).
 const input = { live: false, hands: 0, supported: true };
 let xrStart = 0, seenHands = false;
