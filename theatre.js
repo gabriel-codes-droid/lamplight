@@ -8,6 +8,9 @@ const INK = '#160c06', PAPER = '#e9c98b', GROUND = 430;
 const TEACH_HOLD = 2.5;   // seconds to hold still when teaching a shape
 const MATCH_HOLD = 0.6;   // seconds a match must last to count
 const ALIVE_TIME = 7;     // seconds of story animation per scene
+// Help when stuck: after HELP_AFTER seconds waiting for a shape the hint darkens, and
+// every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
+const HELP_AFTER = 20, HELP_EVERY = 10, HELP_STEP = 0.03, HELP_FLOOR = 0.3;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const ramp = (p, a, b) => clamp01((p - a) / (b - a));
@@ -126,7 +129,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
-  const s = { phase: 'intro', i: 0, t: 0, hold: 0, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'intro', i: 0, t: 0, hold: 0, stuck: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -135,7 +138,15 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, ref: null, cooldown: 0 });
     else startScene(0);
   }
-  function startScene(i) { Object.assign(s, { phase: 'intro', i, t: 0, hold: 0, snap: null }); }
+  function startScene(i) { Object.assign(s, { phase: 'intro', i, t: 0, hold: 0, stuck: 0, snap: null }); }
+
+  // The threshold the player has to beat right now. It never drops below
+  // HELP_FLOOR (or the configured threshold, if that is already lower).
+  function currentThreshold() {
+    if (s.stuck < HELP_AFTER) return threshold;
+    const steps = Math.floor((s.stuck - HELP_AFTER) / HELP_EVERY) + 1;
+    return Math.max(Math.min(threshold, HELP_FLOOR), threshold - steps * HELP_STEP);
+  }
   function succeed() {
     let snap = null;
     if (s.segs.length) {
@@ -169,8 +180,9 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
       else if (!s.ref || iou(s.mask, s.ref) < 0.78) { s.ref = s.mask; s.still = 0; }
       else { s.still += el; if (s.still >= TEACH_HOLD) saveTeach(s.mask, true); }
     } else if (s.phase === 'wait') {
+      s.stuck += el;
       s.score = bestMatch(s.mask, shapes[SCENES[s.i].shape]); s.angle = match.angle;
-      s.hold = s.score >= threshold ? s.hold + el : Math.max(0, s.hold - el * 2);
+      s.hold = s.score >= currentThreshold() ? s.hold + el : Math.max(0, s.hold - el * 2);
       if (s.hold >= MATCH_HOLD) succeed();
     }
   }
@@ -233,8 +245,11 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
       scene.draw(c, p, time, cr);
       if (s.phase !== 'alive') {
         text(scene.prompt, 46, 28, s.phase === 'intro' ? clamp01(s.t / 1.2) * 0.8 : 0.8);
-        // faint hint of the target shape; it darkens as the player gets close
-        drawMask(shapes[scene.shape][0], W / 2, 215, 230, `rgba(22,12,6,${0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD)})`);
+        // faint hint of the target shape; it darkens as the player gets close,
+        // and again when they have been stuck for a while
+        const help = s.phase === 'wait' ? ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) : 0;
+        drawMask(shapes[scene.shape][0], W / 2, 215, 230, `rgba(22,12,6,${0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD) + 0.22 * help})`);
+        if (help > 0) text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
       } else if (s.snap) {
         const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story
         c.save(); c.translate(cr[0], cr[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
@@ -247,5 +262,5 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   }
 
   begin();
-  return { update, draw, skip, state: s };
+  return { update, draw, skip, state: s, threshold: currentThreshold };
 }
