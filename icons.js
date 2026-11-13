@@ -48,10 +48,10 @@ const EDGES = [
 const PALM = [0, 1, 5, 9, 13, 17];                 // outline of the palm, for the soft fill
 const LINE_W = 2.4, DOT_R = 3.1;
 
-const SOFT = 'rgba(255,255,255,0.12)';
+const SOFT = 'rgba(255,255,255,0.10)';   // palm fill; dots are Blue 60 from the kit
 
 // An <svg> string. line / dot are CSS colours.
-export function iconSVG(name, size = 64, { line = '#ffffff', dot = '#2d88ff' } = {}) {
+export function iconSVG(name, size = 64, { line = 'rgba(255,255,255,0.9)', dot = '#148bfd' } = {}) {
   const hands = ICONS[name] || [];
   let out = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 112 112" width="${size}" height="${size}" aria-hidden="true">`;
   for (const h of hands) {
@@ -64,7 +64,7 @@ export function iconSVG(name, size = 64, { line = '#ffffff', dot = '#2d88ff' } =
 }
 
 // Draw an icon on a canvas 2D context, centred on (cx, cy), `size` pixels wide.
-export function drawIcon(c, name, cx, cy, size, line = '#ffffff', dot = '#2d88ff') {
+export function drawIcon(c, name, cx, cy, size, line = 'rgba(255,255,255,0.9)', dot = '#148bfd') {
   const hands = ICONS[name];
   if (!hands) return;
   const k = size / 100, x0 = cx - size / 2, y0 = cy - size / 2;

@@ -20,6 +20,8 @@ const HELP_AFTER = 20, HELP_EVERY = 10, HELP_STEP = 0.03, HELP_FLOOR = 0.3;
 const INK_A = Array.from({ length: 33 }, (_, i) => `rgba(22,12,6,${(i / 32).toFixed(3)})`);
 const inkA = (a) => INK_A[Math.round(Math.max(0, Math.min(1, a)) * 32)];   // ink at alpha a (steps of 1/32)
 const FLICK = Array.from({ length: 8 }, (_, i) => `rgba(255,236,170,${(i * 0.006).toFixed(3)})`);
+const UI_FONTS = {};   // Inter, the kit's typeface, for system UI
+const uiFont = (size, weight) => UI_FONTS[size + '/' + weight] || (UI_FONTS[size + '/' + weight] = `${weight} ${size}px Inter, system-ui, sans-serif`);
 const FONTS = {};
 const fontOf = (size) => FONTS[size] || (FONTS[size] = `${size}px Georgia, serif`);
 const AMBIENT = 0.05;     // seconds: how often the wall repaints when only slow ambient motion changes
@@ -347,20 +349,24 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     c.strokeStyle = INK; c.lineCap = 'round';
     for (let i = 0; i < segs.length; i++) { const g = segs[i]; c.lineWidth = g.r * 2; c.beginPath(); c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); c.stroke(); }
   }
-  // Horizon-style system UI on the wall: dark glass panels with white text.
-  function glass(x, y, w, h, r) {
-    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath();
+  // System UI on the wall, in the Meta RLDS dark theme: panels are a #414141 -> #272727
+  // gradient with a 28 radius and a soft beveled edge; text is white at 90% / 70%.
+  const panelGrad = (y0, y1) => { const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, 'rgba(65,65,65,0.96)'); g.addColorStop(1, 'rgba(39,39,39,0.96)'); return g; };
+  const TITLE_GRAD = panelGrad(44, 400), CHIP_GRAD = panelGrad(92, 208), TOAST_GRAD = panelGrad(H / 2 - 70, H / 2 + 70);
+  function glass(x, y, w, h, r, grad) {
+    c.fillStyle = grad; c.beginPath();
     if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
-    c.fill(); c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
+    c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();   // beveled edge
   }
-  // A round glass chip with the gesture to make, top left of the wall.
+  // A round chip with the gesture to make, top left of the wall.
   function gestureChip(name) {
-    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath(); c.arc(96, 150, 58, 0, 7); c.fill();
-    c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
+    c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(96, 150, 58, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
     drawIcon(c, name, 96, 150, 96);
   }
-  function textOn(str, y, size, color) {
-    c.font = fontOf(size); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
+  function textOn(str, y, size, color, weight = 500) {
+    c.font = uiFont(size, weight); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
   }
   function text(str, y, size = 28, alpha = 0.8) {
     c.font = fontOf(size); c.textAlign = 'center';
@@ -426,19 +432,19 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     const scene = SCENES[s.i];
     if (s.phase === 'title') {
       ground(c);
-      glass(112, 44, 800, 356, 40);
-      textOn('Lamplight', 130, 60, '#f3d9a4');
-      textOn('Put your controllers down and hold up your hands.', 200, 32, '#f5f6f7');
+      glass(112, 44, 800, 356, 28, TITLE_GRAD);
+      textOn('Lamplight', 136, 56, 'rgba(255,255,255,0.9)', 700);
+      textOn('Put your controllers down and hold up your hands.', 200, 28, 'rgba(255,255,255,0.9)');
       if (s.live && s.supported === false) {
-        textOn('This session has no hand tracking.', 280, 32, '#ffb4a8');
-        textOn('Turn on Hand Tracking in your headset settings, then enter VR again.', 326, 24, '#b8bcc2');
+        textOn('This session has no hand tracking.', 280, 28, '#f7818c', 700);
+        textOn('Turn on Hand Tracking in your headset settings, then enter VR again.', 326, 22, 'rgba(255,255,255,0.7)');
       } else if (!s.live) {
-        textOn('No headset? Press Space to begin.', 300, 24, '#b8bcc2');
+        textOn('No headset? Press Space to begin.', 300, 22, 'rgba(255,255,255,0.7)');
       } else {
-        textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 26, '#b8bcc2');
+        textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 24, 'rgba(255,255,255,0.7)');
         for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked
           const on = h < s.hands;
-          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#bcd9ff' : '#6b6f76', on ? '#2d88ff' : '#474a50');
+          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#ffffff' : '#747474', on ? '#148bfd' : '#5a5a5a');
         }
       }
     } else if (s.phase === 'teach') {
@@ -485,8 +491,8 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     }
     if (s.lost > LOST_SHOW && (s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0))) {
       c.fillStyle = 'rgba(11,7,5,0.4)'; c.fillRect(0, 0, W, H);
-      glass(172, H / 2 - 70, 680, 140, 70);
-      textOn('Bring your hands back into view', H / 2 + 14, 40, '#f5f6f7');
+      glass(172, H / 2 - 70, 680, 140, 28, TOAST_GRAD);
+      textOn('Bring your hands back into view', H / 2 + 14, 36, 'rgba(255,255,255,0.9)', 700);
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
   }
