@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lamplight</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0b0705; color: #e9c98b; font-family: Georgia, serif; overflow: hidden; }
+  #panel { position: fixed; top: 12px; left: 12px; max-width: 360px; background: rgba(11,7,5,.8); padding: 12px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
+  #panel h1 { margin: 0 0 6px; font-size: 20px; }
+  details { margin-top: 8px; }
+  textarea { width: 100%; height: 110px; background: #160c06; color: #e9c98b; border: 1px solid #6b3d18; font: 11px monospace; }
+  button#copy { margin-top: 6px; background: #e9c98b; border: 0; border-radius: 6px; padding: 6px 12px; font-family: inherit; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="panel">
+  <h1>Lamplight</h1>
+  A shadow-puppet story you play with your bare hands. Sit down, enter VR, and put your controllers away.
+  <br><small>No headset? Press Space to step through the story.</small>
+  <details>
+    <summary>Export shapes</summary>
+    <textarea id="export" readonly></textarea>
+    <button id="copy">Copy</button>
+  </details>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
