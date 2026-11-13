@@ -2,6 +2,7 @@
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
 import { drawIcon } from './icons.js';
+import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
 export const W = 1024, H = 512;
@@ -337,6 +338,12 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   }
 
   function drawMask(mask, cx, cy, size, style) {
+    const path = maskPath(mask);          // smooth traced outline (null where Path2D is missing)
+    if (path) {
+      c.save(); c.translate(cx - size / 2, cy - size / 2); c.scale(size / N, size / N);
+      c.fillStyle = style; c.fill(path, 'evenodd'); c.restore();
+      return;
+    }
     const cell = size / N;
     c.fillStyle = style; c.beginPath();
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) if (mask[y * N + x]) {
