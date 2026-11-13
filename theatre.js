@@ -9,6 +9,7 @@ const TEACH_HOLD = 2.5;   // seconds to hold still when teaching a shape
 const MATCH_HOLD = 0.6;   // seconds a match must last to count
 const TITLE_HOLD = 1;     // seconds both hands must stay tracked on the title scene
 const LOST_SHOW = 0.4;    // seconds without any hand before the "bring your hands back" message
+const INTRO_TIME = 3.5;   // seconds the prompt is shown before the player is asked to match
 const ALIVE_TIME = 7;     // seconds of story animation per scene
 // Help when stuck: after HELP_AFTER seconds waiting for a shape the hint darkens, and
 // every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
@@ -153,7 +154,7 @@ const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
 const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
 const SCENES = [
   {
-    shape: 'bird',
+    shape: 'bird', alive: 11,
     prompt: 'Mira dropped her key across the river. Make a bird.',
     caption: 'The little bird drops the key into Mira\'s hands.',
     creature: flight([[0, 0, 0], [0.35, 800, 380], [0.8, 215, 360], [1, 420, -120]]),
@@ -165,7 +166,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog',
+    shape: 'dog', alive: 11,
     prompt: 'A wolf blocks the path. Make a dog to chase it off.',
     caption: 'The wolf has never met a dog so brave.',
     creature: (p, sx, sy) => {
@@ -180,7 +181,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'bird', alive: 10,
+    shape: 'bird', alive: 14,
     prompt: 'Night in the pines. A lantern hangs too high. Make a bird.',
     caption: 'The lantern swings down. The pines hold their breath.',
     creature: flight([[0, 0, 0], [0.4, 722, 192], [0.85, 252, 330], [1, 330, -120]]),
@@ -197,7 +198,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog', alive: 10,
+    shape: 'dog', alive: 14,
     prompt: 'Sheep crowd the lane. Make a dog to herd them to the pen.',
     caption: 'Round they go, the whole woolly flock.',
     creature: flight([[0, 0, 0], [0.25, 330, 388], [0.55, 560, 388], [0.85, 720, 388], [1, 760, 388]]),
@@ -211,7 +212,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'rabbit', alive: 10,
+    shape: 'rabbit', alive: 14,
     prompt: 'The gate is latched from the far side. Make a rabbit.',
     caption: 'The latch lifts and the gate sighs open.',
     creature: flight([[0, 0, 0], [0.3, 440, 395], [0.55, 585, 396], [0.72, 668, 342], [0.8, 670, 342], [1, 700, 396]]),
@@ -222,7 +223,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'rabbit',
+    shape: 'rabbit', alive: 11,
     prompt: 'A wall stands before home. Make a rabbit to dig under it.',
     caption: 'Under the wall and out of the dark.',
     creature: flight([[0, 0, 0], [0.35, 455, 395], [0.6, 520, 425], [0.8, 610, 395], [1, 640, 395]]),
@@ -303,7 +304,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     const needsHands = s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0);
     const paused = needsHands && s.lost > 0;
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
-    if (s.phase === 'intro' && s.t > 2.5) { s.phase = 'wait'; s.t = 0; }
+    if (s.phase === 'intro' && s.t > INTRO_TIME) { s.phase = 'wait'; s.t = 0; }
     if (s.phase === 'alive' && s.t > (SCENES[s.i].alive || ALIVE_TIME)) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
     if (s.phase === 'alive' && !s.callAgain && s.t > (SCENES[s.i].alive || ALIVE_TIME) * 0.55) { // the creature calls once more
       s.callAgain = true; sfx.creature && sfx.creature(SCENES[s.i].shape);
