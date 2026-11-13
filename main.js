@@ -7,6 +7,8 @@ import { encode, decode } from './matcher.js';
 import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import { DEFAULT_SHAPES } from './shapes.js';
 import { createAudio } from './audio.js';
+import { createShadow } from './shadow.js';
+import { createRecorder, createReplay } from './capture.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
 const WALL_Z = -1.6, WALL_Y = 1.25, WALL_W = 3.2, WALL_H = 1.6;
@@ -15,6 +17,10 @@ const PPM = W / WALL_W;                        // canvas pixels per metre of wal
 
 const params = new URLSearchParams(location.search);
 const threshold = parseFloat(params.get('th')) || 0.55; // ?th=0.5 makes matching easier
+const startScene = Math.max(0, (parseInt(params.get('start'), 10) || 1) - 1); // ?start=4 begins at scene 4
+const replayFile = params.get('replay');                // ?replay=captures/x.json plays a capture back
+const recorder = params.has('capture') ? createRecorder() : null; // ?capture records the hands
+const debug = params.has('debug') || !!replayFile || !!recorder;  // on-page readout of the matcher
 
 // ---- shapes: built-in ones, overridden by ones taught on this device ----
 // A shape is a list of templates (hex strings). A plain string is accepted too.
@@ -56,7 +62,7 @@ addEventListener('pointerdown', wake); addEventListener('keydown', wake);
 const canvas = document.createElement('canvas');
 canvas.width = W; canvas.height = H;
 const theatre = createTheatre({
-  ctx: canvas.getContext('2d'), shapes, teach, threshold, sfx,
+  ctx: canvas.getContext('2d'), shapes, teach, start: startScene, threshold, sfx,
   onShapeSaved(name, mask) {
     hexShapes[name] = [...(hexShapes[name] || []), encode(mask)]; stored[name] = hexShapes[name].slice();
     try { localStorage.setItem(STORE, JSON.stringify(stored)); } catch (e) { /* storage unavailable */ }
@@ -116,72 +122,61 @@ const hands = [0, 1].map((i) => {
   return hand;
 });
 
-const FINGERS = [
-  ['thumb-metacarpal', 'thumb-phalanx-proximal', 'thumb-phalanx-distal', 'thumb-tip'],
-  ...['index', 'middle', 'ring', 'pinky'].map((f) => [
-    `${f}-finger-metacarpal`, `${f}-finger-phalanx-proximal`, `${f}-finger-phalanx-intermediate`,
-    `${f}-finger-phalanx-distal`, `${f}-finger-tip`]),
-];
-const KNUCKLES = ['index', 'middle', 'ring', 'pinky'].map((f) => `${f}-finger-phalanx-proximal`);
-
-// Shadow of a point: follow the ray from the lamp through it to the wall.
-function project(v) {
-  const d = v.z - LAMP.z;
-  if (d > -0.05) return null;                  // behind the lamp: no shadow
-  const t = (WALL_Z - LAMP.z) / d;
-  return {
-    x: (LAMP.x + t * (v.x - LAMP.x) + WALL_W / 2) * PPM,
-    y: (WALL_Y + WALL_H / 2 - (LAMP.y + t * (v.y - LAMP.y))) * PPM,
-    k: t * PPM,                                // metres -> pixels at this depth
-  };
-}
+// ---- shadow: hand joints -> segments on the wall (see shadow.js) ----
+const shadow = createShadow({ lamp: LAMP, wallZ: WALL_Z, wallY: WALL_Y, wallW: WALL_W, wallH: WALL_H, ppm: PPM });
 const segs = [];
-function bone(a, b, radius) {
-  const pa = project(a), pb = project(b);
-  if (pa && pb) segs.push({ ax: pa.x, ay: pa.y, bx: pb.x, by: pb.y, r: radius * (pa.k + pb.k) / 2 });
+
+// ---- capture and replay (see capture.js) ----
+let replay = null, replayT0 = 0, replayFailed = '';
+if (replayFile) {
+  fetch(replayFile)
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then((data) => { replay = createReplay(data); replayT0 = performance.now(); })
+    .catch((e) => { replayFailed = e.message; });
 }
-const tmp = new THREE.Vector3();
-function collectShadow() {          // returns how many hands are tracked
-  segs.length = 0;
-  let tracked = 0;
-  if (!renderer.xr.isPresenting) return tracked;
-  for (const hand of hands) {
-    const J = hand.joints, wrist = J && J['wrist'];
-    if (!hand.visible || !wrist || wrist.visible === false) continue;
-    tracked++;
-    for (const chain of FINGERS) {
-      let prev = wrist;
-      chain.forEach((name, i) => {
-        const j = J[name];
-        if (!j) return;
-        bone(prev.position, j.position, i < 2 ? 0.017 : 0.0095); // thick near the palm
-        prev = j;
-      });
-    }
-    for (let i = 0; i < KNUCKLES.length - 1; i++) {
-      const a = J[KNUCKLES[i]], b = J[KNUCKLES[i + 1]];
-      if (a && b) bone(a.position, b.position, 0.014);
-    }
-    const mid = J['middle-finger-phalanx-proximal'];           // forearm stub, like a real shadow
-    if (mid) {
-      tmp.copy(wrist.position).sub(mid.position).normalize().multiplyScalar(0.22).add(wrist.position);
-      bone(wrist.position, tmp, 0.027);
-    }
-  }
-  return tracked;
-}
+const debugEl = document.getElementById('debug'), downloadBtn = document.getElementById('dl');
+if (debugEl && debug) debugEl.hidden = false;
+if (downloadBtn && recorder) downloadBtn.hidden = false;
+downloadBtn?.addEventListener('click', () => recorder.download());
+renderer.xr.addEventListener('sessionend', () => { if (recorder) recorder.download(); });
 
 addEventListener('keydown', (e) => { if (e.code === 'Space') theatre.skip(); });
 
 const clock = new THREE.Clock();
+let hudAt = 0, hudFrames = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);
-  input.live = renderer.xr.isPresenting;
-  input.hands = collectShadow();
-  if (input.hands > 0) { seenHands = true; input.supported = true; }
-  else if (input.live && input.supported === null && !seenHands && performance.now() - xrStart > 8000) input.supported = false;
+  const now = clock.elapsedTime;
+  if (replay) {                                   // a capture is driving the hands
+    replay.step(performance.now() - replayT0);
+    input.live = true; input.supported = true;
+    input.hands = shadow.collect(replay.hands, segs);
+  } else if (replayFile && !replayFailed) {       // still loading it
+    input.live = true; input.supported = true; input.hands = 0; segs.length = 0;
+  } else if (renderer.xr.isPresenting) {
+    input.live = true;
+    input.hands = shadow.collect(hands, segs);
+    if (recorder) recorder.sample(performance.now(), hands, { phase: theatre.state.phase, shape: theatre.target() });
+    if (input.hands > 0) { seenHands = true; input.supported = true; }
+    else if (input.supported === null && !seenHands && performance.now() - xrStart > 8000) input.supported = false;
+  } else {
+    input.live = false; input.hands = 0; segs.length = 0;
+  }
   theatre.update(dt, segs, input);
-  theatre.draw(clock.elapsedTime);
+  theatre.draw(now);
   wallTex.needsUpdate = true;
   renderer.render(scene, camera);
+
+  hudFrames++;
+  if (debugEl && debug && now - hudAt > 0.25) {
+    const st = theatre.state;
+    debugEl.textContent = [
+      `phase ${st.phase}  target ${theatre.target() || '-'}`,
+      `score ${st.score.toFixed(2)} at ${st.angle || 0}deg  needs ${theatre.threshold().toFixed(2)}  hold ${st.hold.toFixed(2)}`,
+      `hands ${input.hands}  fps ${Math.round(hudFrames / (now - hudAt))}`,
+      replayFailed ? `Replay failed: ${replayFailed}` : replayFile && !replay ? 'Loading replay...' : '',
+      recorder ? `Recording: ${recorder.count} samples` : '',
+    ].filter(Boolean).join('\n');
+    hudAt = now; hudFrames = 0;
+  }
 });

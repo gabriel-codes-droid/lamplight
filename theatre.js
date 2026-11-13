@@ -230,7 +230,7 @@ export const SHAPE_NAMES = [...new Set(SCENES.map((sc) => sc.shape))];
 
 // shapes: { name: [mask, mask, ...] }. Several templates per shape are allowed;
 // teach: names to (re)teach this run, on top of any shape that has no template yet.
-export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
+export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
@@ -241,7 +241,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   function begin() {
     const missing = toTeach.shift() || SHAPE_NAMES.find((n) => !has(n));
     if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, ref: null, cooldown: 0 });
-    else startScene(0);
+    else startScene(Math.min(start, SCENES.length - 1));
   }
   function startScene(i) { Object.assign(s, { phase: 'intro', i, t: 0, hold: 0, stuck: 0, snap: null }); }
 
@@ -408,5 +408,10 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
   }
 
-  return { update, draw, skip, state: s, threshold: currentThreshold };
+  // What the player is being asked to make right now (null on the title and end screens).
+  function target() {
+    if (s.phase === 'teach') return s.teach;
+    return s.phase === 'intro' || s.phase === 'wait' || s.phase === 'alive' ? SCENES[s.i].shape : null;
+  }
+  return { update, draw, skip, target, state: s, threshold: currentThreshold };
 }
