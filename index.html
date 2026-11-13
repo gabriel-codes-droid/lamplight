@@ -5,60 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lamplight</title>
 <style>
-  /* Horizon OS style: dark glass panels, big rounded corners, pill buttons, white text. */
+  /* Horizon OS look: a floating dark glass panel, large radii, pill buttons,
+     list rows on raised cards, white text with dimmer secondary text. */
   :root {
-    --glass: rgba(24, 26, 30, 0.86);
-    --glass-edge: rgba(255, 255, 255, 0.10);
+    --glass: rgba(26, 28, 32, 0.88);
+    --card: rgba(255, 255, 255, 0.07);
+    --card-hover: rgba(255, 255, 255, 0.11);
+    --edge: rgba(255, 255, 255, 0.10);
     --text: #f5f6f7;
-    --text-dim: #b8bcc2;
+    --text-dim: #aeb3ba;
     --blue: #0064e0;
-    --blue-hover: #1a78f0;
-    --chip: rgba(255, 255, 255, 0.12);
-    --chip-hover: rgba(255, 255, 255, 0.20);
+    --blue-hover: #1f7cf2;
     --lamp: #f3d9a4;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: #0b0705; color: var(--text); overflow: hidden;
-    font-family: "Optimistic Display", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    font-family: "Optimistic Display", "Optimistic Text", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
 
-  #panel { position: fixed; top: 20px; left: 20px; width: min(400px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow: auto;
-    padding: 24px; border-radius: 28px; background: var(--glass); border: 1px solid var(--glass-edge);
-    -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45); }
-  #panel h1 { margin: 0; font: 600 34px/1.1 Georgia, serif; color: var(--lamp); letter-spacing: 0.01em; }
-  .tagline { margin: 8px 0 20px; font-size: 16px; line-height: 1.45; color: var(--text-dim); }
+  #panel { position: fixed; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 28px;
+    border-radius: 36px; background: var(--glass); border: 1px solid var(--edge);
+    -webkit-backdrop-filter: blur(30px); backdrop-filter: blur(30px); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55); }
+  #panel.min { top: 16px; left: 16px; transform: none; width: auto; max-width: 340px; padding: 10px 10px 10px 20px; border-radius: 28px; }
+  #panel.min .body > :not(#debug):not(#dl) { display: none; }   /* keep the debug readout and capture button */
+  #panel.min pre#debug { margin: 8px 10px 6px 0; }
+  #panel.min h1 { font-size: 22px; }
 
-  ol.steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 12px; counter-reset: s; }
-  ol.steps li { counter-increment: s; display: flex; gap: 14px; align-items: flex-start; font-size: 16px; line-height: 1.4; }
-  ol.steps li::before { content: counter(s); flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--chip);
-    display: grid; place-items: center; font-size: 14px; font-weight: 600; margin-top: 1px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  h1 { margin: 0; font: 600 36px/1.1 Georgia, serif; color: var(--lamp); letter-spacing: 0.01em; }
+  #toggle { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: var(--card); color: var(--text);
+    font-size: 22px; line-height: 1; cursor: pointer; transition: background 0.15s; }
+  #toggle:hover { background: var(--card-hover); }
+  .lead { margin: 10px 0 24px; font-size: 17px; line-height: 1.45; color: var(--text-dim); }
+  h2 { margin: 0 0 12px; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+  section { margin-bottom: 24px; }
+
+  /* list rows */
+  ol.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: s; }
+  ol.rows li { counter-increment: s; display: flex; align-items: center; gap: 16px; min-height: 64px; padding: 12px 18px 12px 12px;
+    border-radius: 20px; background: var(--card); font-size: 17px; line-height: 1.35; }
+  ol.rows li::before { content: counter(s); flex: none; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.12);
+    display: grid; place-items: center; font-size: 16px; font-weight: 600; }
+
+  /* the three gestures */
+  .gestures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .gesture { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 8px 14px; border-radius: 24px; background: var(--card); text-align: center; }
+  .gesture .ico { width: 84px; height: 84px; display: grid; place-items: center; }
+  .gesture b { font-size: 16px; font-weight: 600; }
+  .gesture span { font-size: 13px; color: var(--text-dim); line-height: 1.3; }
 
   /* the three.js VR button, restyled and moved here by main.js */
-  #enter { display: block; }
-  #enter button, button.pill { display: block; width: 100%; min-height: 52px; padding: 0 24px; border: 0; border-radius: 999px;
-    background: var(--blue); color: #fff; font-weight: 600; font-size: 17px; font-family: inherit; cursor: pointer; transition: background 0.15s; }
-  #VRButton { position: static !important; width: 100% !important; left: auto !important; bottom: auto !important; transform: none !important;
-    min-height: 56px; border: 0 !important; border-radius: 999px !important; background: var(--blue) !important; color: #fff !important;
-    font-weight: 600 !important; font-size: 17px !important; font-family: inherit !important; letter-spacing: 0.04em; opacity: 1 !important; padding: 0 24px !important; }
-  #VRButton:hover, button.pill:hover { background: var(--blue-hover) !important; }
-  #VRButton[style*="cursor: auto"], #VRButton:disabled, #VRButton[disabled] { background: var(--chip) !important; color: var(--text-dim) !important; cursor: default; }
-  button.chip { min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: var(--chip); color: var(--text);
+  #enter { margin-top: 4px; }
+  #VRButton { position: static !important; display: block !important; width: 100% !important; left: auto !important; bottom: auto !important;
+    transform: none !important; min-height: 60px; padding: 0 28px !important; border: 0 !important; border-radius: 999px !important;
+    background: var(--blue) !important; color: #fff !important; opacity: 1 !important; cursor: pointer;
+    font-weight: 600 !important; font-size: 18px !important; font-family: inherit !important; letter-spacing: 0.03em; transition: background 0.15s; }
+  #VRButton:hover { background: var(--blue-hover) !important; }
+  #VRButton[style*="cursor: auto"], #VRButton:disabled { background: rgba(255, 255, 255, 0.12) !important; color: var(--text-dim) !important; cursor: default; }
+  button.chip { min-height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.12); color: var(--text);
     font-weight: 600; font-size: 15px; font-family: inherit; cursor: pointer; transition: background 0.15s; }
-  button.chip:hover { background: var(--chip-hover); }
-  button:focus-visible, summary:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+  button.chip:hover { background: rgba(255, 255, 255, 0.2); }
+  button:focus-visible, summary:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
 
   .hint { margin: 14px 0 0; font-size: 14px; color: var(--text-dim); text-align: center; }
-  details { margin-top: 18px; border-top: 1px solid var(--glass-edge); padding-top: 14px; }
+  details { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--edge); }
   summary { cursor: pointer; font-size: 15px; font-weight: 600; list-style: none; padding: 6px 0; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: "+"; float: right; color: var(--text-dim); }
+  summary::after { content: "+"; float: right; color: var(--text-dim); font-size: 20px; line-height: 1; }
   details[open] summary::after { content: "\2212"; }
-  details p { margin: 6px 0 10px; font-size: 14px; line-height: 1.45; color: var(--text-dim); }
-  textarea { width: 100%; height: 120px; padding: 12px; border-radius: 16px; border: 1px solid var(--glass-edge); resize: vertical;
+  details p { margin: 6px 0 12px; font-size: 14px; line-height: 1.45; color: var(--text-dim); }
+  textarea { width: 100%; height: 120px; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--edge); resize: vertical;
     background: rgba(0, 0, 0, 0.35); color: var(--text); font: 12px/1.4 ui-monospace, Consolas, monospace; }
-  pre#debug { margin: 14px 0 0; padding: 12px 14px; border-radius: 16px; background: rgba(0, 0, 0, 0.35);
+  pre#debug { margin: 16px 0 0; padding: 12px 16px; border-radius: 18px; background: rgba(0, 0, 0, 0.4);
     font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; color: #cfe3ff; }
   #dl { margin-top: 12px; width: 100%; }
   [hidden] { display: none !important; }
+
+  @media (max-width: 520px) {
+    .gestures { grid-template-columns: 1fr; }
+    .gesture { flex-direction: row; justify-content: flex-start; padding: 10px 16px; text-align: left; }
+    .gesture .ico { width: 56px; height: 56px; }
+  }
 </style>
 <script type="importmap">
 { "imports": {
@@ -69,23 +96,43 @@
 </head>
 <body>
 <main id="panel">
-  <h1>Lamplight</h1>
-  <p class="tagline">A shadow-puppet story you play with your bare hands. Sit down, and let the lamp do the rest.</p>
-  <ol class="steps">
-    <li><span>Turn on <b>Hand Tracking</b> in your Quest settings.</span></li>
-    <li><span>Put your controllers down.</span></li>
-    <li><span>Enter VR and hold up both hands.</span></li>
-  </ol>
-  <div id="enter"></div>
-  <p class="hint">No headset? Press Space to step through the story.</p>
-  <details>
-    <summary>Shapes</summary>
-    <p>Shapes you teach are saved on this device. Copy this text into <code>shapes.js</code> to ship them to everyone.</p>
-    <textarea id="export" readonly aria-label="Exported shapes"></textarea>
-    <button id="copy" class="chip" style="margin-top:10px">Copy</button>
-  </details>
-  <pre id="debug" hidden></pre>
-  <button id="dl" class="chip" hidden>Download capture</button>
+  <header>
+    <h1>Lamplight</h1>
+    <button id="toggle" aria-label="Minimise panel" title="Minimise">&minus;</button>
+  </header>
+  <div class="body">
+    <p class="lead">A shadow-puppet story you play with your bare hands. Sit down and let the lamp do the rest.</p>
+
+    <section aria-labelledby="h-ready">
+      <h2 id="h-ready">Get ready</h2>
+      <ol class="rows">
+        <li><span>Turn on <b>Hand Tracking</b> in your Quest settings.</span></li>
+        <li><span>Put your controllers down.</span></li>
+        <li><span>Enter VR and hold up both hands.</span></li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="h-shapes">
+      <h2 id="h-shapes">Shapes you will make</h2>
+      <div class="gestures">
+        <div class="gesture"><div class="ico" data-icon="bird"></div><div><b>Bird</b><br><span>Two hands, wings out</span></div></div>
+        <div class="gesture"><div class="ico" data-icon="dog"></div><div><b>Dog</b><br><span>Thumb up, mouth open</span></div></div>
+        <div class="gesture"><div class="ico" data-icon="rabbit"></div><div><b>Rabbit</b><br><span>Two fingers up</span></div></div>
+      </div>
+    </section>
+
+    <div id="enter"></div>
+    <p class="hint">No headset? Press Space to step through the story.</p>
+
+    <details>
+      <summary>Shapes</summary>
+      <p>Shapes you teach are saved on this device. Copy this text into <code>shapes.js</code> to ship them to everyone.</p>
+      <textarea id="export" readonly aria-label="Exported shapes"></textarea>
+      <button id="copy" class="chip" style="margin-top:10px">Copy</button>
+    </details>
+    <pre id="debug" hidden></pre>
+    <button id="dl" class="chip" hidden>Download capture</button>
+  </div>
 </main>
 <script type="module" src="./main.js"></script>
 </body>

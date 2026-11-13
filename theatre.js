@@ -1,6 +1,7 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
+import { drawIcon } from './icons.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
 export const W = 1024, H = 512;
@@ -352,6 +353,12 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
     c.fill(); c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
   }
+  // A round glass chip with the gesture to make, top left of the wall.
+  function gestureChip(name) {
+    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath(); c.arc(86, 140, 48, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
+    drawIcon(c, name, 86, 140, 66);
+  }
   function textOn(str, y, size, color) {
     c.font = fontOf(size); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
   }
@@ -429,9 +436,9 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         textOn('No headset? Press Space to begin.', 300, 24, '#b8bcc2');
       } else {
         textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 26, '#b8bcc2');
-        for (let h = 0; h < 2; h++) {   // one dot per hand seen
-          c.fillStyle = h < s.hands ? '#2d88ff' : 'rgba(255,255,255,0.2)';
-          c.beginPath(); c.arc(W / 2 + (h ? 36 : -36), 350, 16, 0, 7); c.fill();
+        for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked
+          const on = h < s.hands;
+          drawIcon(c, 'hand', W / 2 + (h ? 52 : -52), 345, 72, on ? '#bcd9ff' : '#6b6f76', on ? '#2d88ff' : '#474a50');
         }
       }
     } else if (s.phase === 'teach') {
@@ -444,6 +451,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         text('Make the shape with your hands, then hold still.', 80, 20, 0.6);
         c.strokeStyle = 'rgba(22,12,6,0.6)'; c.lineWidth = 6; c.lineCap = 'round';
         c.beginPath(); c.arc(W - 60, 60, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp01(s.still / TEACH_HOLD)); c.stroke();
+        gestureChip(s.teach);
       }
     } else if (s.phase === 'end') {
       ground(c); house(c, 860); mira(c, 800, time);
@@ -466,6 +474,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         const help = s.phase === 'wait' ? ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) : 0;
         drawMask(shapes[scene.shape][0], W / 2, 215, 230, inkA(0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD) + 0.22 * help));
         if (help > 0) text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
+        gestureChip(scene.shape);
       } else if (s.snap) {
         const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story
         c.save(); c.translate(cr[0], cr[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);

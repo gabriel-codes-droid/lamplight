@@ -98,6 +98,7 @@ view for a second, like a live session.
 - `shadow.js`: projects hand joints from the lamp onto the wall
 - `audio.js`: night ambience, chime and creature sounds, all synthesised
 - `capture.js`: `?capture` recorder and `?replay` player
+- `icons.js`: the bird, dog, rabbit and open-hand gesture icons (one set of data drawn as SVG on the page and on the wall canvas)
 - `shapes.js`: the built-in hand shapes (paste your exported shapes here)
 
 ## Notes on performance

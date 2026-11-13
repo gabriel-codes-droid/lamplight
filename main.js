@@ -8,6 +8,7 @@ import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import { DEFAULT_SHAPES } from './shapes.js';
 import { createAudio } from './audio.js';
 import { createShadow } from './shadow.js';
+import { iconSVG } from './icons.js';
 import { createRecorder, createReplay } from './capture.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
@@ -43,6 +44,17 @@ for (const name of names('record')) hexShapes[name] = [];
 const shapes = {};
 for (const [name, list] of Object.entries(hexShapes)) shapes[name] = list.map(decode);
 const teach = [...new Set([...names('record'), ...names('add')])];
+
+// ---- the page: gesture icons, and a button that shrinks the panel so the wall stays visible ----
+for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSVG(el.dataset.icon, el.clientWidth || 84);
+const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
+function setMinimised(min) {
+  panel.classList.toggle('min', min);
+  toggle.textContent = min ? '+' : '−';
+  toggle.setAttribute('aria-label', min ? 'Open panel' : 'Minimise panel');
+}
+toggle.addEventListener('click', () => setMinimised(!panel.classList.contains('min')));
+if (debug) setMinimised(true);   // replaying or debugging: keep the wall in view
 
 const exportBox = document.getElementById('export');
 function showExport() {
