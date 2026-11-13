@@ -1,31 +1,112 @@
 # Lamplight
 
-A seated, hands-only shadow-puppet game for Meta Quest (WebXR, three.js).
+A seated, hands-only shadow-puppet story for Meta Quest (WebXR, three.js).
 
-## Run it on a Quest
+A lamp glows behind you and throws your hands onto a paper wall. Make a bird, a
+dog or a rabbit with your bare hands and the shadow comes alive to help Mira
+walk home through the night: fetching her key across a river, chasing off a
+wolf, bringing down a lantern, herding sheep, opening a latched gate and
+digging under a wall. There are six scenes; a first playthrough takes about
+three minutes. No controllers, no menus, no build step.
+
+Made for the Meta VR Start Developer Competition.
+
+## Controls
+
+There are none. Sit down, put the controllers away and use your hands.
+
+- **Title:** hold both hands up. The story starts once both are tracked.
+- **Each scene:** make the shape the wall asks for and hold it for about half a
+  second. Tilting your hands up to 20 degrees either way is fine. If you get
+  stuck, the faint hint on the wall darkens after 20 seconds and matching gets a
+  little easier every 10 seconds after that.
+- **Hands out of view:** the game pauses its timers and asks you to bring them
+  back.
+- **No headset (desktop preview):** press Space to step through the story.
+
+Hand tracking must be on in the Quest settings. If the session has none, the
+wall says so.
+
+## Run it
 
 WebXR needs HTTPS or localhost.
 
-- **Quickest:** push this folder to a GitHub repo, turn on GitHub Pages, open the
-  link in the Quest browser, press "Enter VR".
-- **Local:** in this folder run `python -m http.server 8080`, connect the Quest by
-  USB, run `adb reverse tcp:8080 tcp:8080`, open `http://localhost:8080` on the Quest.
+- **Quickest:** open the GitHub Pages link in the Quest Browser and press
+  "Enter VR".
+- **Local:** in this folder run `python -m http.server 8080`, connect the Quest
+  by USB, run `adb reverse tcp:8080 tcp:8080`, and open `http://localhost:8080`
+  on the Quest.
+- **Desktop:** the same local server, in any browser, to preview the story with
+  Space, or to replay a capture (see below).
 
-## First run: teach the three shapes
+Everything is plain ES modules; three.js comes from a CDN through an import map
+in `index.html`. There is nothing to install or build.
 
-The game ships with no shapes. On first run it asks you to teach it a bird, a dog
-and a rabbit: make the shape, hold still about 2.5 seconds. They are saved on that
-headset. Then the story starts.
+## Record the shapes
 
-To ship them to everyone: open "Export shapes" on the page, copy the line, and
-paste it over the contents of `shapes.js`.
+The game ships with no shapes: they have to be made on a real headset, because
+that is the only way to get genuine hand data.
 
-- `?record` re-teaches all shapes.
-- `?th=0.5` makes matching easier (default 0.55, higher is stricter).
+1. Open the game on the Quest. On first run it asks for a bird, a dog and a
+   rabbit: make the shape, hold still about 2.5 seconds. They are saved on that
+   headset (localStorage), and the story starts.
+2. Open "Export shapes" on the page (desktop browser, or the Quest Browser
+   before entering VR), copy the text, and paste it over the contents of
+   `shapes.js`.
+3. Commit and push. Everyone who opens the game now gets your shapes.
+
+A shape can have several templates, and the best match wins, so recording two or
+three variations of each (different sizes, one hand versus two) makes the game
+more forgiving. Tilts of up to 20 degrees are handled automatically.
+
+| Add to the URL    | What it does |
+| ----------------- | ------------ |
+| `?record`         | Re-teach every shape, replacing the saved ones. `?record=bird,dog` re-teaches only those. |
+| `?add`            | Teach one more template for every shape, keeping the old ones. `?add=rabbit` does one shape. |
+| `?th=0.5`         | Matching threshold. Lower is easier, higher is stricter (default 0.55). |
+| `?start=4`        | Start at scene 4 instead of scene 1. |
+| `?debug`          | Show the phase, target, match score and frame rate on the page. |
+
+## Tune matching without a headset
+
+Record your hands once, then replay them on a desktop as often as you like.
+
+1. Open `?capture` in the headset and play. The hand joints (about 30 samples a
+   second, roughly 1 MB a minute) are recorded for the whole VR session, and the
+   file downloads when you leave VR. There is also a "Download capture" button
+   on the page.
+2. Put the file in a `captures/` folder next to `index.html`. Capture files are
+   git-ignored by default.
+3. On a desktop, serve the folder and open
+   `http://localhost:8080/?replay=captures/yourfile.json`. The hands play back
+   through exactly the same code as live tracking and the page shows the live
+   match score and best tilt angle.
+
+To test one shape directly, use `?start=` to jump to its scene, for example
+`?replay=captures/dog.json&start=2&th=0.5`. Scenes are numbered in `SCENES` order:
+1 river (bird), 2 wolf (dog), 3 pines (bird), 4 sheep (dog), 5 gate (rabbit),
+6 wall (rabbit). The replay starts at the title scene and needs both hands in
+view for a second, like a live session.
 
 ## Files
 
-- `main.js`: room, lamp, hand tracking, shadow projection
-- `theatre.js`: game flow, story scenes and all drawing (edit `SCENES` to add levels)
-- `matcher.js`: silhouette matching
-- `shapes.js`: built-in hand shapes
+- `index.html`: the page and the import map
+- `main.js`: room, lamp, hand tracking, shapes storage, the main loop
+- `theatre.js`: game flow, story scenes and all drawing (edit `SCENES` to add
+  scenes)
+- `matcher.js`: silhouette matching, with tilted and multiple templates
+- `shadow.js`: projects hand joints from the lamp onto the wall
+- `audio.js`: night ambience, chime and creature sounds, all synthesised
+- `capture.js`: `?capture` recorder and `?replay` player
+- `shapes.js`: the built-in hand shapes (paste your exported shapes here)
+
+## Notes on performance
+
+Tuned for a steady 72 fps on Quest 3. The wall canvas is repainted and
+re-uploaded to the GPU only when something on it changed (idle repaints are
+around 20 a second instead of 72), the per-frame code reuses its buffers instead
+of allocating, and the session asks the headset for a 72 Hz target frame rate.
+
+## License
+
+MIT, see `LICENSE`.

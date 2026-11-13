@@ -1,0 +1,22 @@
+# dependencies and build output (the game has neither, but just in case)
+node_modules/
+dist/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# local environment files
+.env
+.env.*
+
+# hand captures recorded with ?capture are large and personal: keep yours
+# locally, and commit one deliberately with `git add -f captures/name.json`
+captures/*.json
