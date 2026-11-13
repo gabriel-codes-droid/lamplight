@@ -234,7 +234,7 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
-  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'title', i: 0, t: 0, hold: 0, stuck: 0, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -261,6 +261,8 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     }
     Object.assign(s, { phase: 'alive', t: 0, snap });
     sfx.chime && sfx.chime();
+    sfx.creature && sfx.creature(SCENES[s.i].shape);
+    s.callAgain = false;
   }
   function saveTeach(mask, persist) {
     const saved = mask.slice();
@@ -289,6 +291,9 @@ export function createTheatre({ ctx, shapes, teach = [], threshold = 0.55, onSha
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
     if (s.phase === 'intro' && s.t > 2.5) { s.phase = 'wait'; s.t = 0; }
     if (s.phase === 'alive' && s.t > (SCENES[s.i].alive || ALIVE_TIME)) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
+    if (s.phase === 'alive' && !s.callAgain && s.t > (SCENES[s.i].alive || ALIVE_TIME) * 0.55) { // the creature calls once more
+      s.callAgain = true; sfx.creature && sfx.creature(SCENES[s.i].shape);
+    }
     if (s.phase === 'end' && s.t > 8) startScene(0);
     if (s.clock < 0.06) return;          // match about 16 times a second
     const el = s.clock; s.clock = 0;

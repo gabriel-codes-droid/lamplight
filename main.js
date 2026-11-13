@@ -6,6 +6,7 @@ import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { encode, decode } from './matcher.js';
 import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import { DEFAULT_SHAPES } from './shapes.js';
+import { createAudio } from './audio.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
 const WALL_Z = -1.6, WALL_Y = 1.25, WALL_W = 3.2, WALL_H = 1.6;
@@ -46,21 +47,10 @@ document.getElementById('copy')?.addEventListener('click', () => {
   exportBox.select(); navigator.clipboard?.writeText(exportBox.value).catch(() => {});
 });
 
-// ---- sound: a small chime when a shadow comes alive ----
-let audio = null;
-const wake = () => { try { audio = audio || new AudioContext(); audio.resume(); } catch (e) { /* no audio */ } };
+// ---- sound: night ambience, a chime, one short sound per creature (see audio.js) ----
+const sfx = createAudio();
+const wake = sfx.wake;
 addEventListener('pointerdown', wake); addEventListener('keydown', wake);
-const sfx = {
-  chime() {
-    if (!audio) return;
-    [523.25, 659.25, 783.99].forEach((f, i) => {
-      const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + i * 0.12;
-      o.type = 'sine'; o.frequency.value = f;
-      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + 0.02); g.gain.exponentialRampToValueAtTime(0.001, t + 0.9);
-      o.connect(g).connect(audio.destination); o.start(t); o.stop(t + 1);
-    });
-  },
-};
 
 // ---- the wall is a canvas ----
 const canvas = document.createElement('canvas');
