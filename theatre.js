@@ -355,9 +355,9 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   }
   // A round glass chip with the gesture to make, top left of the wall.
   function gestureChip(name) {
-    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath(); c.arc(86, 140, 48, 0, 7); c.fill();
+    c.fillStyle = 'rgba(24,26,30,0.9)'; c.beginPath(); c.arc(96, 150, 58, 0, 7); c.fill();
     c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 2; c.stroke();
-    drawIcon(c, name, 86, 140, 66);
+    drawIcon(c, name, 96, 150, 96);
   }
   function textOn(str, y, size, color) {
     c.font = fontOf(size); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
@@ -438,7 +438,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 26, '#b8bcc2');
         for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked
           const on = h < s.hands;
-          drawIcon(c, 'hand', W / 2 + (h ? 52 : -52), 345, 72, on ? '#bcd9ff' : '#6b6f76', on ? '#2d88ff' : '#474a50');
+          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#bcd9ff' : '#6b6f76', on ? '#2d88ff' : '#474a50');
         }
       }
     } else if (s.phase === 'teach') {

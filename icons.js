@@ -1,58 +1,88 @@
-// Hand-gesture icons in the style of the Horizon OS "Custom Hands" set: soft
-// translucent line-art hands. Drawn here from simple round bones, so the same
-// data makes both the SVGs on the web page and the icons on the wall canvas.
-// Each bone is [x1, y1, x2, y2, radius] in a 100 x 100 box.
+// Hand-gesture icons drawn as hand-tracking skeletons: dots at the joints, joined
+// by lines (the same idea as the Quest's own joints). Each hand is 21 points in
+// a 100 x 100 box, in the usual landmark order:
+//   0 wrist | 1-4 thumb | 5-8 index | 9-12 middle | 13-16 ring | 17-20 pinky
+// Each finger runs knuckle -> middle joint -> upper joint -> tip. A bird is two hands.
 export const ICONS = {
-  hand: [   // open hand: "hold up your hands"
-    [50, 66, 50, 60, 16],
-    [38, 50, 34, 22, 5.5], [49, 48, 49, 12, 5.5], [60, 50, 64, 20, 5.5], [68, 56, 77, 32, 5],
-    [33, 66, 17, 47, 6],
-    [50, 76, 50, 99, 13],
-  ],
-  bird: [   // two hands, thumbs hooked, fingers out as wings
-    [50, 72, 50, 58, 11],
-    [42, 60, 9, 32, 5], [40, 65, 5, 47, 5], [41, 70, 7, 62, 5],
-    [58, 60, 91, 32, 5], [60, 65, 95, 47, 5], [59, 70, 93, 62, 5],
-    [50, 52, 50, 38, 6], [52, 34, 63, 31, 3],
-  ],
-  dog: [    // one hand in profile: thumb is the ear, fingers are the snout
-    [34, 72, 54, 68, 14],
-    [58, 62, 88, 56, 6.5], [58, 73, 86, 74, 5],
-    [42, 58, 38, 28, 5.5],
-    [34, 74, 22, 99, 11],
-  ],
-  rabbit: [ // two fingers up as ears, the rest folded under the thumb
-    [50, 74, 50, 66, 15],
-    [43, 56, 36, 16, 6], [57, 56, 65, 16, 6],
-    [64, 70, 66, 64, 7],
-    [34, 72, 53, 68, 6],
-    [50, 80, 50, 99, 12],
-  ],
+  hand: [[   // open hand, fingers up: "hold up your hands"
+    [50, 92], [37, 79], [25, 67], [16, 55], [9, 43],
+    [38, 57], [35, 41], [33, 29], [32, 18],
+    [49, 54], [49, 37], [49, 24], [49, 11],
+    [60, 57], [63, 41], [65, 29], [66, 18],
+    [70, 63], [75, 50], [78, 40], [80, 31],
+  ]],
+  rabbit: [[ // two fingers up as ears, ring and little finger folded, thumb across them
+    [50, 92], [38, 80], [34, 67], [42, 60], [54, 62],
+    [40, 58], [36, 40], [33, 26], [31, 13],
+    [51, 55], [54, 38], [57, 25], [60, 12],
+    [61, 58], [67, 56], [65, 66], [57, 67],
+    [70, 64], [75, 62], [71, 71], [63, 72],
+  ]],
+  dog: [[    // hand in profile: thumb is the ear, two fingers the top jaw, two the bottom jaw
+    [20, 80], [30, 71], [36, 57], [38, 43], [38, 30],
+    [42, 65], [58, 61], [72, 58], [87, 56],
+    [43, 70], [59, 67], [72, 64], [85, 62],
+    [44, 75], [58, 77], [70, 78], [83, 80],
+    [44, 80], [56, 83], [66, 85], [76, 87],
+  ]],
 };
+// The bird is two hands with fingers fanned out as wings and the thumbs up as the head.
+const wing = [
+  [46, 80], [44, 71], [46, 63], [48, 55], [50, 47],
+  [40, 69], [28, 59], [19, 52], [10, 45],
+  [39, 73], [26, 67], [16, 63], [6, 59],
+  [39, 77], [27, 75], [18, 74], [9, 74],
+  [41, 81], [31, 83], [23, 85], [15, 88],
+];
+ICONS.bird = [wing, wing.map(([x, y]) => [100 - x, y])];
 
-const OUTLINE = 2.4;   // extra width of the pale outline, in icon units
+// Lines to draw between the 21 points of one hand.
+const EDGES = [
+  [0, 1], [1, 2], [2, 3], [3, 4],                  // thumb
+  [0, 5], [5, 6], [6, 7], [7, 8],                  // index
+  [9, 10], [10, 11], [11, 12],                     // middle
+  [13, 14], [14, 15], [15, 16],                    // ring
+  [0, 17], [17, 18], [18, 19], [19, 20],           // little finger
+  [5, 9], [9, 13], [13, 17],                       // across the knuckles
+];
+const PALM = [0, 1, 5, 9, 13, 17];                 // outline of the palm, for the soft fill
+const LINE_W = 2.4, DOT_R = 3.1;
 
-// An <svg> string: pale outline first, then the translucent fill, so overlapping bones merge.
-export function iconSVG(name, size = 64, { stroke = 'rgba(255,255,255,0.85)', fill = '#9aa1ab' } = {}) {
-  const bones = ICONS[name] || [];
-  const line = (b, w, col) => `<line x1="${b[0]}" y1="${b[1]}" x2="${b[2]}" y2="${b[3]}" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 112 112" width="${size}" height="${size}" aria-hidden="true">` +
-    bones.map((b) => line(b, b[4] * 2 + OUTLINE, stroke)).join('') +
-    bones.map((b) => line(b, b[4] * 2 - 0.4, fill)).join('') + '</svg>';
+const SOFT = 'rgba(255,255,255,0.12)';
+
+// An <svg> string. line / dot are CSS colours.
+export function iconSVG(name, size = 64, { line = '#ffffff', dot = '#2d88ff' } = {}) {
+  const hands = ICONS[name] || [];
+  let out = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 112 112" width="${size}" height="${size}" aria-hidden="true">`;
+  for (const h of hands) {
+    out += `<polygon points="${PALM.map((i) => h[i].join(',')).join(' ')}" fill="${SOFT}"/>`;
+    out += `<g stroke="${line}" stroke-width="${LINE_W}" stroke-linecap="round">` +
+      EDGES.map(([a, b]) => `<line x1="${h[a][0]}" y1="${h[a][1]}" x2="${h[b][0]}" y2="${h[b][1]}"/>`).join('') + '</g>';
+    out += h.map((p) => `<circle cx="${p[0]}" cy="${p[1]}" r="${DOT_R}" fill="${dot}" stroke="${line}" stroke-width="1.2"/>`).join('');
+  }
+  return out + '</svg>';
 }
 
 // Draw an icon on a canvas 2D context, centred on (cx, cy), `size` pixels wide.
-export function drawIcon(c, name, cx, cy, size, stroke = 'rgba(255,255,255,0.85)', fill = '#9aa1ab') {
-  const bones = ICONS[name];
-  if (!bones) return;
+export function drawIcon(c, name, cx, cy, size, line = '#ffffff', dot = '#2d88ff') {
+  const hands = ICONS[name];
+  if (!hands) return;
   const k = size / 100, x0 = cx - size / 2, y0 = cy - size / 2;
   c.lineCap = 'round';
-  for (let pass = 0; pass < 2; pass++) {
-    c.strokeStyle = pass ? fill : stroke;
-    for (let i = 0; i < bones.length; i++) {
-      const b = bones[i];
-      c.lineWidth = (pass ? b[4] * 2 - 0.4 : b[4] * 2 + OUTLINE) * k;
-      c.beginPath(); c.moveTo(x0 + b[0] * k, y0 + b[1] * k); c.lineTo(x0 + b[2] * k, y0 + b[3] * k); c.stroke();
+  for (let h = 0; h < hands.length; h++) {
+    const p = hands[h];
+    c.fillStyle = SOFT; c.beginPath();
+    for (let i = 0; i < PALM.length; i++) { const q = p[PALM[i]]; i ? c.lineTo(x0 + q[0] * k, y0 + q[1] * k) : c.moveTo(x0 + q[0] * k, y0 + q[1] * k); }
+    c.closePath(); c.fill();
+    c.strokeStyle = line; c.lineWidth = LINE_W * k; c.beginPath();
+    for (let e = 0; e < EDGES.length; e++) {
+      const a = p[EDGES[e][0]], b = p[EDGES[e][1]];
+      c.moveTo(x0 + a[0] * k, y0 + a[1] * k); c.lineTo(x0 + b[0] * k, y0 + b[1] * k);
+    }
+    c.stroke();
+    c.lineWidth = 1.2 * k;
+    for (let i = 0; i < p.length; i++) {
+      c.fillStyle = dot; c.beginPath(); c.arc(x0 + p[i][0] * k, y0 + p[i][1] * k, DOT_R * k, 0, 7); c.fill(); c.stroke();
     }
   }
 }
