@@ -63,6 +63,7 @@ function setMinimised(min) {
 toggle.addEventListener('click', () => setMinimised(!panel.classList.contains('min')));
 if (debug) setMinimised(true);   // replaying or debugging: keep the wall in view
 
+if (params.has('record') || params.has('add') || params.has('dev') || debug) document.getElementById('devbox').hidden = false;   // the export box is a developer tool: hidden for players
 const exportBox = document.getElementById('export');
 function showExport() {
   if (exportBox) exportBox.value = `export const DEFAULT_SHAPES = ${JSON.stringify(hexShapes, null, 2)};\nexport const DEFAULT_CUSTOM = ${JSON.stringify(customMeta, null, 2)};`;
