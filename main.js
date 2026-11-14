@@ -113,10 +113,11 @@ function renderCustom() {
 const addDialog = createAddShape(document.getElementById('add'), {
   existing: () => theatre.shapeNames().filter((n) => shapes[n] && shapes[n].length)
     .map((n) => ({ name: n, label: (customMeta[n] && customMeta[n].label) || n, templates: shapes[n] })),
-  save({ name, label, icon, mask }) {
-    customMeta[name] = { label, icon }; customStored[name] = customMeta[name];
+  save({ name, label, icon, masks, dots }) {
+    customMeta[name] = { label, icon, dots }; customStored[name] = customMeta[name];
     try { localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
-    saveHex(name, mask); theatre.addCustom(name, customMeta[name], mask); renderCustom();
+    masks.forEach((m, i) => { saveHex(name, m); theatre.addCustom(name, customMeta[name], m); });
+    renderCustom();
   },
 });
 document.getElementById('add-open').addEventListener('click', () => addDialog.open());
@@ -145,7 +146,11 @@ renderer.xr.addEventListener('sessionstart', () => {
 });
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b0705);
+// a deep blue Meta-style backdrop instead of flat black
+const bgc = document.createElement('canvas'); bgc.width = 4; bgc.height = 256;
+{ const g = bgc.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#222a3d'); gr.addColorStop(0.55, '#141a29'); gr.addColorStop(1, '#0b0e16'); g.fillStyle = gr; g.fillRect(0, 0, 4, 256); }
+const bgTex = new THREE.CanvasTexture(bgc); bgTex.colorSpace = THREE.SRGBColorSpace;
+scene.background = bgTex;
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.05, 20);
 camera.position.set(0, 1.15, 0.4); camera.lookAt(0, WALL_Y - 0.1, WALL_Z); // desktop preview view
 addEventListener('resize', () => {
@@ -157,7 +162,7 @@ const wallTex = new THREE.CanvasTexture(canvas);
 wallTex.colorSpace = THREE.SRGBColorSpace;
 wallTex.generateMipmaps = false;               // the wall is re-uploaded often: skip rebuilding mipmaps each time
 wallTex.minFilter = THREE.LinearFilter;
-const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, WALL_H), new THREE.MeshBasicMaterial({ map: wallTex }));
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, WALL_H), new THREE.MeshBasicMaterial({ map: wallTex, transparent: true }));
 wall.position.set(0, WALL_Y, WALL_Z);
 scene.add(wall);
 

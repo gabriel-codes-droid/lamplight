@@ -97,3 +97,19 @@ export function drawWolf(c, cx, bottom, size, flip = false) {
   fit(c, im, cx, bottom - size / 2, size, flip, 1);
   return true;
 }
+
+// A stored dotted hand (what the player recorded with "Add a shape"): lines between the joints and a dot on each.
+// dots: [[ [x, y] x21 ], ...] one list per hand, x and y in 0..1 camera space.
+const BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [9, 10], [10, 11], [11, 12], [13, 14], [14, 15], [15, 16],
+  [0, 17], [17, 18], [18, 19], [19, 20], [5, 9], [9, 13], [13, 17], [0, 9]];
+export function drawDots(c, dots, cx, cy, size) {
+  let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+  for (const h of dots) for (const p of h) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const k = size / Math.max(x1 - x0, y1 - y0, 0.01), ox = cx - (x0 + x1) / 2 * k, oy = cy - (y0 + y1) / 2 * k;
+  c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 2.5; c.lineCap = 'round'; c.fillStyle = '#ffffff';
+  for (const h of dots) {
+    c.beginPath(); for (const [a, b] of BONES) { c.moveTo(h[a][0] * k + ox, h[a][1] * k + oy); c.lineTo(h[b][0] * k + ox, h[b][1] * k + oy); } c.stroke();
+    c.beginPath(); for (const p of h) { c.moveTo(p[0] * k + ox + 4, p[1] * k + oy); c.arc(p[0] * k + ox, p[1] * k + oy, 4, 0, 7); } c.fill();
+  }
+  c.restore();
+}

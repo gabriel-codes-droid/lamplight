@@ -1,11 +1,12 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
-import { drawWolf, drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
+import { drawDots as drawDots2, drawWolf, drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
 import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
 export const W = 1024, H = 512;
+const WALL_R = 56;                              // corner radius of the wall card
 const INK = '#160c06', PAPER = '#e9c98b', GROUND = 430;
 const TEACH_HOLD = 2.5;   // seconds to hold still when teaching a shape
 const MATCH_HOLD = 0.6;   // seconds a match must last to count
@@ -519,6 +520,20 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     }
     c.fill();
   }
+  // The tracked hand as dots: one on every joint the shadow is built from. They turn blue
+  // while the game is holding a match, so the player sees the hand being recognised.
+  function drawDots(segs) {
+    if (!s.live && !segs.length) return;
+    const on = s.cand !== null && s.cand !== undefined;
+    c.fillStyle = on ? '#148bfd' : 'rgba(255,255,255,0.92)'; c.strokeStyle = 'rgba(20,12,6,0.55)'; c.lineWidth = 1.5;
+    c.beginPath();
+    for (let i = 0; i < segs.length; i++) {
+      const g = segs[i];
+      c.moveTo(g.ax + 5.5, g.ay); c.arc(g.ax, g.ay, 5.5, 0, 7);
+      c.moveTo(g.bx + 5.5, g.by); c.arc(g.bx, g.by, 5.5, 0, 7);
+    }
+    c.fill(); c.stroke();
+  }
   function drawSegs(segs) {
     c.strokeStyle = INK; c.lineCap = 'round';
     for (let i = 0; i < segs.length; i++) { const g = segs[i]; c.lineWidth = g.r * 2; c.beginPath(); c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); c.stroke(); }
@@ -608,6 +623,9 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
 
   function paint(time) {
     // lamp-lit paper wall, with a slow flicker
+    c.clearRect(0, 0, W, H);
+    c.save();                                   // the wall is a rounded card, like the Meta panels, not a sharp rectangle
+    c.beginPath(); if (c.roundRect) c.roundRect(0, 0, W, H, WALL_R); else c.rect(0, 0, W, H); c.clip();
     c.globalAlpha = 1; c.fillStyle = bgGrad; c.fillRect(0, 0, W, H);
     c.fillStyle = FLICK[Math.round((1 + Math.sin(time * 7.3) * Math.sin(time * 2.1)) * 3.5)]; c.fillRect(0, 0, W, H);
 
@@ -671,7 +689,9 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
           c.save(); c.globalAlpha = help;
           c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(W / 2, 225, 118, 0, 7); c.fill();
           c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
-          if (GESTURES.includes(scene.shape)) drawGesture(c, scene.shape, W / 2, 225, 190); else drawAnimal(c, scene.shape, W / 2, 225, 150, false, labelOf(scene.shape));
+          if (GESTURES.includes(scene.shape)) drawGesture(c, scene.shape, W / 2, 225, 190);
+          else if (customMeta[scene.shape] && customMeta[scene.shape].dots) drawDots2(c, customMeta[scene.shape].dots, W / 2, 225, 190);
+          else drawAnimal(c, scene.shape, W / 2, 225, 150, false, labelOf(scene.shape));
           c.restore();
           text('Make this gesture with your hands.', 80, 20, 0.6 * help);
         }
@@ -685,6 +705,10 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
       textOn('Bring your hands back into view', H / 2 + 14, 36, 'rgba(255,255,255,0.9)', 700);
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
+    drawDots(s.segs);
+    c.restore();
+    c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 3;       // beveled rim
+    c.beginPath(); if (c.roundRect) c.roundRect(1.5, 1.5, W - 3, H - 3, WALL_R - 1.5); else c.rect(1.5, 1.5, W - 3, H - 3); c.stroke();
   }
 
   // What the player is being asked to make right now (null on the title and end screens).

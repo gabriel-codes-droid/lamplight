@@ -10,6 +10,7 @@ const MP_VERSION = '0.10.14';
 const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VERSION;
 const MP_MODEL = 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task';
 
+const SAMPLES = 3;        // the gesture is recorded this many times, so it is recognised from a slightly different pose too
 const HOLD = 2.5;          // seconds the gesture has to stay still
 // ?same=0.75 changes how alike two gestures must be to count as the same
 const SAME = parseFloat(new URLSearchParams(globalThis.location ? globalThis.location.search : '').get('same')) || 0.7;          // a new gesture scoring this against an existing one is "the same gesture"
@@ -56,7 +57,7 @@ export function createAddShape(root, api) {
   const steps = { form: $('[data-step="form"]'), camera: $('[data-step="camera"]') };
   const nameInput = $('#add-name'), status = $('#add-status'), video = $('#add-video'), overlay = $('#add-overlay'), bar = $('#add-bar');
   const iconRow = $('#add-icons'), formMsg = $('#add-form-msg');
-  let stream = null, landmarker = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
+  let samples = [], dots = null, stream = null, landmarker = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
   const buf = new Uint8Array(N * N), ref = new Uint8Array(N * N);
 
   // icon choices: the kit's animals, or just a letter
@@ -102,7 +103,7 @@ export function createAddShape(root, api) {
         : 'Could not start the camera or hand tracking: ' + (e && e.message ? e.message : e), 'error');
       return;
     }
-    still = 0; refMask = null; lastT = performance.now();
+    still = 0; refMask = null; samples = []; dots = null; lastT = performance.now();
     say('Make your gesture in front of the camera and hold still.');
     loop();
   }
@@ -129,17 +130,28 @@ export function createAddShape(root, api) {
     if (!mask) return;
     if (!refMask || iou(mask, ref) < 0.78) { ref.set(mask); refMask = true; still = 0; bar.value = 0; say('Hold still...'); return; }
     still += dt; bar.value = Math.min(1, still / HOLD);
-    if (still >= HOLD) capture(mask.slice());
+    if (still >= HOLD) capture(mask.slice(), hands);
   }
 
-  async function capture(mask) {
+  async function capture(mask, hands) {
     busy = true;
-    const twin = findSimilar(mask, api.existing());
-    if (twin) {                                // already have this gesture: ask for a different one
-      say('That gesture is too close to "' + twin.label + '". Make a different gesture.', 'error');
-      still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 1800); return;
+    if (!samples.length) {
+      const twin = findSimilar(mask, api.existing());
+      if (twin) {                              // already have this gesture: ask for a different one
+        say('That gesture is too close to "' + twin.label + '". Make a different gesture.', 'error');
+        still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 1800); return;
+      }
+      dots = hands.map((L) => L.map((p) => [+(1 - p.x).toFixed(3), +p.y.toFixed(3)]));   // the dotted hand, kept with the shape
+    } else if (iou(mask, samples[0]) < 0.45) {   // later samples must be the same gesture as the first
+      say('That is not the same gesture as the first one. Make it again.', 'error');
+      still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 1500); return;
     }
-    api.save({ name, label, icon, mask });
+    samples.push(mask);
+    if (samples.length < SAMPLES) {
+      say('Got ' + samples.length + ' of ' + SAMPLES + '. Lower your hand, then make the same gesture again, a little differently.', 'ok');
+      still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 2000); return;
+    }
+    api.save({ name, label, icon, masks: samples, dots });
     say('Saved "' + label + '". It is now part of the game.', 'ok');
     cancelAnimationFrame(raf); raf = 0;
     setTimeout(close, 1400);

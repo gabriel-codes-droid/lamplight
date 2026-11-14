@@ -76,7 +76,7 @@ more forgiving. Tilts of up to 20 degrees are handled automatically.
 ## Add your own shape
 
 On the page, press **Add a shape**. Name the creature, pick an icon (or a letter), then make
-its gesture in front of the camera and hold still for about 2.5 seconds. If the gesture is
+its gesture in front of the camera and hold still for about 2.5 seconds, three times (so it is recognised from slightly different poses). The dotted hand is stored with the shape. If the gesture is
 too close to one the game already has, it asks for a different one. Saved shapes are matched
 together with the built-in ones, and a wrong one plays a generic reaction. The camera is
 used only on that page and nothing is uploaded; hand tracking (MediaPipe) and its model are
