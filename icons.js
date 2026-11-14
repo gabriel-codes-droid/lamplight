@@ -1,4 +1,7 @@
-// Hand-gesture icons drawn as hand-tracking skeletons: dots at the joints, joined
+// Gesture icons. Both the page and the wall use the hand illustrations from the Meta UI
+// kit ("Custom Hands": assets/hands/*.jpg, a light outline on black, made to be
+// screen-blended over a dark panel). Until an image has loaded (or without a browser),
+// the skeleton icons below are drawn instead; they are hand-gesture icons drawn as hand-tracking skeletons: dots at the joints, joined
 // by lines (the same idea as the Quest's own joints). Each hand is 21 points in
 // a 100 x 100 box, in the usual landmark order:
 //   0 wrist | 1-4 thumb | 5-8 index | 9-12 middle | 13-16 ring | 17-20 pinky
@@ -48,6 +51,39 @@ const EDGES = [
 const PALM = [0, 1, 5, 9, 13, 17];                 // outline of the palm, for the soft fill
 const LINE_W = 2.4, DOT_R = 3.1;
 
+// the kit's hand images: bird = "diamond shape" (two hands), dog = "thumb-up", rabbit = "two finger up", hand = "touch open hand"
+// Each JPEG is turned into a transparent outline sprite once it has loaded: the dark
+// background and fill drop out, so only the kit's light outline is left.
+const SPRITE = {};
+const waiting = [];
+function makeSprite(im) {
+  const cv = document.createElement('canvas');
+  cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+  const x = cv.getContext('2d');
+  x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, cv.width, cv.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = Math.max(p[i], p[i + 1], p[i + 2]);
+    p[i] = 216; p[i + 1] = 223; p[i + 2] = 232;
+    p[i + 3] = Math.max(0, Math.min(255, (lum - 28) * 3.2));
+  }
+  x.putImageData(d, 0, 0);
+  return cv;
+}
+if (typeof Image !== 'undefined' && typeof document !== 'undefined') {
+  for (const n of ['bird', 'dog', 'rabbit', 'hand']) {
+    const im = new Image();
+    im.onload = () => {
+      try { SPRITE[n] = makeSprite(im); } catch (e) { return; }    // tainted canvas etc: keep the skeleton icon
+      for (const f of waiting) f(n);
+    };
+    im.src = new URL('./assets/hands/' + n + '.jpg', import.meta.url).href;
+  }
+}
+// Calls f(name) for each hand sprite as it becomes ready (and right away for ones that already are).
+export function onHandSprite(f) { waiting.push(f); for (const n in SPRITE) f(n); }
+export const handSpriteURL = (name) => (SPRITE[name] ? SPRITE[name].toDataURL() : null);
+
 const SOFT = 'rgba(255,255,255,0.10)';   // palm fill; dots are Blue 60 from the kit
 
 // An <svg> string. line / dot are CSS colours.
@@ -64,7 +100,13 @@ export function iconSVG(name, size = 64, { line = 'rgba(255,255,255,0.9)', dot =
 }
 
 // Draw an icon on a canvas 2D context, centred on (cx, cy), `size` pixels wide.
-export function drawIcon(c, name, cx, cy, size, line = 'rgba(255,255,255,0.9)', dot = '#148bfd') {
+export function drawIcon(c, name, cx, cy, size, line = 'rgba(255,255,255,0.9)', dot = '#148bfd', alpha = 1) {
+  const im = SPRITE[name];
+  if (im) {
+    const k = size / Math.max(im.width, im.height), w = im.width * k, h = im.height * k;
+    c.save(); c.globalAlpha = alpha; c.drawImage(im, cx - w / 2, cy - h / 2, w, h); c.restore();
+    return;
+  }
   const hands = ICONS[name];
   if (!hands) return;
   const k = size / 100, x0 = cx - size / 2, y0 = cy - size / 2;

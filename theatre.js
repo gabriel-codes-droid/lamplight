@@ -12,10 +12,12 @@ const MATCH_HOLD = 0.6;   // seconds a match must last to count
 const TITLE_HOLD = 1;     // seconds both hands must stay tracked on the title scene
 const LOST_SHOW = 0.4;    // seconds without any hand before the "bring your hands back" message
 const INTRO_TIME = 3.5;   // seconds the prompt is shown before the player is asked to match
+const REACT_TIME = 3;     // seconds a wrong creature reacts before the scene is offered again
 const ALIVE_TIME = 7;     // seconds of story animation per scene
-// Help when stuck: after HELP_AFTER seconds waiting for a shape the hint darkens, and
+// Help when stuck: there is no hint in normal play. After HELP_AFTER seconds without a
+// correct answer the target shape and its gesture icon appear, and
 // every HELP_EVERY seconds from then on the match threshold drops by HELP_STEP.
-const HELP_AFTER = 20, HELP_EVERY = 10, HELP_STEP = 0.03, HELP_FLOOR = 0.3;
+const HELP_AFTER = 30, HELP_EVERY = 10, HELP_STEP = 0.03, HELP_FLOOR = 0.3;
 
 // Strings built once, so drawing doesn't create garbage every frame.
 const INK_A = Array.from({ length: 33 }, (_, i) => `rgba(22,12,6,${(i / 32).toFixed(3)})`);
@@ -151,15 +153,45 @@ function gate(c, open, lift) {   // hinged at x = 527; open 0..1 swings it away,
   c.save(); c.translate(644, GROUND - 66); c.rotate(-1.1 * lift); c.fillRect(-22, -3, 24, 6); c.restore(); // latch
 }
 
+function cart(c, x) {            // a wagon with its wheels sunk in the mud
+  c.fillStyle = INK;
+  c.fillRect(x - 62, GROUND - 80, 124, 34);
+  c.fillRect(x - 70, GROUND - 94, 8, 48); c.fillRect(x + 62, GROUND - 94, 8, 48);
+  c.fillRect(x + 62, GROUND - 56, 44, 5);
+  c.strokeStyle = INK; c.lineWidth = 7; c.lineCap = 'round';
+  for (let w = -1; w <= 1; w += 2) {
+    const wx = x + w * 38;
+    c.beginPath(); c.arc(wx, GROUND - 16, 25, 0, 7); c.stroke();
+    c.lineWidth = 3; c.beginPath(); c.moveTo(wx - 25, GROUND - 16); c.lineTo(wx + 25, GROUND - 16); c.moveTo(wx, GROUND - 41); c.lineTo(wx, GROUND + 9); c.stroke(); c.lineWidth = 7;
+  }
+}
+function rope(c, x0, y0, x1, y1, sag) {
+  c.strokeStyle = INK; c.lineWidth = 4; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo((x0 + x1) / 2, (y0 + y1) / 2 + sag, x1, y1); c.stroke();
+}
+function coil(c, x, y) {
+  c.strokeStyle = INK; c.lineWidth = 4;
+  for (let i = 0; i < 3; i++) { c.beginPath(); c.ellipse(x, y - i * 3, 22 - i * 3, 9 - i, 0, 0, 7); c.stroke(); }
+}
+function chain(c, x0, x1, y) {
+  c.strokeStyle = INK; c.lineWidth = 3;
+  for (let x = x0, i = 0; x <= x1; x += 17, i++) { c.beginPath(); c.ellipse(x, y + (i % 2 ? 3 : -3), 9, 5, 0, 0, 7); c.stroke(); }
+}
+
 // ---------- the story ----------
 // creature(p, sx, sy): where the living shadow is, p = 0..1 through the scene.
 // draw(c, p, time, cr): backdrop and actors; cr is the creature position or null.
 const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
 const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
+const R = (caption, pts) => ({ caption, move: flight(pts) });   // a wrong creature's 3 second reaction
 const SCENES = [
   {
     shape: 'bird', alive: 11,
-    prompt: 'Mira dropped her key across the river. Make a bird.',
+    prompt: 'Mira\'s key is across the river.',
+    reactions: {
+      dog: R('The dog leaps into the river, paddles in circles and swims back.', [[0, 0, 0], [0.25, 420, 400], [0.4, 500, 438], [0.6, 560, 440], [0.8, 450, 438], [1, 330, 395]]),
+      rabbit: R('The rabbit eyes the water, shivers and hops home.', [[0, 0, 0], [0.3, 350, 395], [0.5, 360, 395], [1, 60, 395]]),
+    },
     caption: 'The little bird drops the key into Mira\'s hands.',
     creature: flight([[0, 0, 0], [0.35, 800, 380], [0.8, 215, 360], [1, 420, -120]]),
     draw(c, p, time, cr) {
@@ -171,7 +203,11 @@ const SCENES = [
   },
   {
     shape: 'dog', alive: 11,
-    prompt: 'A wolf blocks the path. Make a dog to chase it off.',
+    prompt: 'A wolf blocks the path.',
+    reactions: {
+      bird: R('The bird flaps at the wolf\'s ears. The wolf only yawns.', [[0, 0, 0], [0.3, 690, 320], [0.5, 720, 300], [0.7, 700, 320], [1, 960, -80]]),
+      rabbit: R('The rabbit sees the wolf and bolts.', [[0, 0, 0], [0.2, 440, 395], [1, -140, 395]]),
+    },
     caption: 'The wolf has never met a dog so brave.',
     creature: (p, sx, sy) => {
       const r = dogRun(p, sx, sy);
@@ -186,7 +222,11 @@ const SCENES = [
   },
   {
     shape: 'bird', alive: 14,
-    prompt: 'Night in the pines. A lantern hangs too high. Make a bird.',
+    prompt: 'Night in the pines. A lantern hangs too high.',
+    reactions: {
+      dog: R('The dog barks and leaps. The lantern hangs far out of reach.', [[0, 0, 0], [0.3, 690, 392], [0.45, 690, 340], [0.6, 690, 392], [0.75, 690, 340], [1, 520, 395]]),
+      rabbit: R('The rabbit hides among the roots until the shadows pass.', [[0, 0, 0], [0.4, 600, 396], [0.55, 610, 424], [1, 610, 424]]),
+    },
     caption: 'The lantern swings down. The pines hold their breath.',
     creature: flight([[0, 0, 0], [0.4, 722, 192], [0.85, 252, 330], [1, 330, -120]]),
     draw(c, p, time, cr) {
@@ -203,7 +243,11 @@ const SCENES = [
   },
   {
     shape: 'dog', alive: 14,
-    prompt: 'Sheep crowd the lane. Make a dog to herd them to the pen.',
+    prompt: 'Sheep crowd the lane, and the pen stands open.',
+    reactions: {
+      bird: R('The bird circles above. The sheep do not look up.', [[0, 0, 0], [0.5, 500, 170], [1, 920, 110]]),
+      rabbit: R('The rabbit startles the flock, then flees from the noise.', [[0, 0, 0], [0.3, 560, 395], [0.5, 520, 395], [1, 80, 395]]),
+    },
     caption: 'Round they go, the whole woolly flock.',
     creature: flight([[0, 0, 0], [0.25, 330, 388], [0.55, 560, 388], [0.85, 720, 388], [1, 760, 388]]),
     draw(c, p, time) {
@@ -217,7 +261,11 @@ const SCENES = [
   },
   {
     shape: 'rabbit', alive: 14,
-    prompt: 'The gate is latched from the far side. Make a rabbit.',
+    prompt: 'The gate is latched from the far side.',
+    reactions: {
+      bird: R('The bird perches on the gate and cannot find the latch.', [[0, 0, 0], [0.4, 590, 290], [0.7, 590, 292], [1, 940, 90]]),
+      dog: R('The dog shoves at the gate. It will not budge.', [[0, 0, 0], [0.3, 480, 390], [0.45, 505, 390], [0.6, 480, 390], [0.75, 505, 390], [1, 300, 390]]),
+    },
     caption: 'The latch lifts and the gate sighs open.',
     creature: flight([[0, 0, 0], [0.3, 440, 395], [0.55, 585, 396], [0.72, 668, 342], [0.8, 670, 342], [1, 700, 396]]),
     draw(c, p, time) {
@@ -228,7 +276,11 @@ const SCENES = [
   },
   {
     shape: 'rabbit', alive: 11,
-    prompt: 'A wall stands before home. Make a rabbit to dig under it.',
+    prompt: 'A wall stands before home.',
+    reactions: {
+      bird: R('The bird pecks at the wall and gives up.', [[0, 0, 0], [0.35, 560, 250], [0.45, 552, 246], [0.55, 562, 254], [0.65, 552, 246], [1, 820, 90]]),
+      dog: R('The dog leaps at the wall and tumbles back.', [[0, 0, 0], [0.3, 430, 392], [0.5, 520, 200], [0.7, 570, 390], [1, 330, 395]]),
+    },
     caption: 'Under the wall and out of the dark.',
     creature: flight([[0, 0, 0], [0.35, 455, 395], [0.6, 520, 425], [0.8, 610, 395], [1, 640, 395]]),
     draw(c, p, time) {
@@ -237,6 +289,74 @@ const SCENES = [
       const dig = ease(ramp(p, 0.4, 0.62));
       if (dig > 0) { c.fillStyle = PAPER; c.beginPath(); c.arc(520, GROUND + 2, 46 * dig, Math.PI, 0); c.fill(); }
       mira(c, 170 + ease(ramp(p, 0.62, 1)) * 640, time);
+    },
+  },
+  // ---- the last four scenes: each pair needs two creatures, one after the other ----
+  {
+    shape: 'bird', alive: 12,
+    prompt: 'The cart is stuck in the mud. The rope is out of reach.',
+    caption: 'The rope drops over the cart\'s hook.',
+    creature: flight([[0, 0, 0], [0.35, 860, 380], [0.7, 610, 330], [1, 570, -120]]),
+    reactions: {
+      dog: R('The dog sniffs the rope and loses interest.', [[0, 0, 0], [0.4, 840, 392], [0.7, 860, 392], [1, 500, 395]]),
+      rabbit: R('The rabbit nibbles the rope. It is far too long to carry.', [[0, 0, 0], [0.4, 850, 396], [0.7, 860, 396], [1, 520, 396]]),
+    },
+    draw(c, p, time, cr) {
+      ground(c); mira(c, 170, time); cart(c, 520);
+      if (p < 0.35 || !cr) coil(c, 860, GROUND - 8);
+      else if (p < 0.7) rope(c, cr[0], cr[1] + 45, cr[0] + 90, cr[1] + 110, 18);   // the bird carries it
+      else rope(c, 582, GROUND - 60, 700, GROUND - 4, 8);                          // hooked on the cart
+    },
+  },
+  {
+    shape: 'dog', alive: 12,
+    prompt: 'The rope is tied on. The cart will not budge.',
+    caption: 'Heave! The cart rolls free.',
+    creature: flight([[0, 0, 0], [0.25, 700, 388], [0.9, 960, 388], [1, 990, 388]]),
+    reactions: {
+      bird: R('The bird tugs the rope. The cart does not move.', [[0, 0, 0], [0.4, 690, 330], [0.6, 700, 334], [0.8, 690, 330], [1, 900, 80]]),
+      rabbit: R('The rabbit nibbles the rope. The cart does not move.', [[0, 0, 0], [0.4, 680, 396], [0.7, 690, 396], [1, 300, 396]]),
+    },
+    draw(c, p, time, cr) {
+      const cx = 520 + ease(ramp(p, 0.25, 0.9)) * 250;
+      ground(c); mira(c, 170 + ease(ramp(p, 0.4, 1)) * 260, time); cart(c, cx);
+      if (cr && p > 0.05) rope(c, cx + 62, GROUND - 60, cr[0] - 30, cr[1] + 38, 10);
+      else rope(c, 582, GROUND - 60, 700, GROUND - 4, 8);
+    },
+  },
+  {
+    shape: 'bird', alive: 12,
+    prompt: 'The gate is chained shut. The key hangs high in the tree.',
+    caption: 'The key drops into Mira\'s hands.',
+    creature: flight([[0, 0, 0], [0.4, 898, 236], [0.85, 252, 330], [1, 330, -120]]),
+    reactions: {
+      dog: R('The dog barks up at the key. Dogs do not climb trees.', [[0, 0, 0], [0.3, 840, 392], [0.45, 840, 346], [0.6, 840, 392], [0.75, 840, 346], [1, 600, 395]]),
+      rabbit: R('The rabbit sits under the branch and wiggles its nose.', [[0, 0, 0], [0.4, 850, 396], [1, 850, 396]]),
+    },
+    draw(c, p, time, cr) {
+      ground(c); rails(c, 330, 515); rails(c, 656, 780); gate(c, 0, 0); chain(c, 540, 636, GROUND - 66);
+      bareTree(c, 780); mira(c, 170, time);
+      if (p < 0.4 || !cr) { c.strokeStyle = INK; c.lineWidth = 2; c.beginPath(); c.moveTo(895, 208); c.lineTo(895, 250); c.stroke(); key(c, 882, 252); }
+      else if (p < 0.85) key(c, cr[0] - 10, cr[1] + 42);
+      else key(c, 196, GROUND - 30);
+    },
+  },
+  {
+    shape: 'rabbit', alive: 12,
+    prompt: 'The chain will not open. The gate stands on soft earth.',
+    caption: 'Under the post, and the chain falls slack.',
+    creature: flight([[0, 0, 0], [0.3, 470, 396], [0.5, 520, 426], [0.62, 600, 398], [0.75, 668, 342], [1, 720, 396]]),
+    reactions: {
+      bird: R('The bird scratches at the chain. It will not break.', [[0, 0, 0], [0.4, 590, 280], [0.7, 590, 284], [1, 940, 90]]),
+      dog: R('The dog digs a shallow hole, gets bored and wanders off.', [[0, 0, 0], [0.3, 480, 392], [0.5, 500, 410], [0.7, 480, 392], [1, 250, 395]]),
+    },
+    draw(c, p, time) {
+      ground(c); rails(c, 330, 515); rails(c, 656, 780);
+      const dig = ease(ramp(p, 0.3, 0.5));
+      if (dig > 0) { c.fillStyle = PAPER; c.beginPath(); c.arc(520, GROUND + 2, 40 * dig, Math.PI, 0); c.fill(); }
+      gate(c, ease(ramp(p, 0.8, 0.95)), ease(ramp(p, 0.74, 0.8)));
+      if (p < 0.76) chain(c, 540, 636, GROUND - 66);
+      mira(c, 170 + ease(ramp(p, 0.85, 1)) * 560, time);
     },
   },
 ];
@@ -252,7 +372,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   const maskBuf = new Uint8Array(N * N), refBuf = new Uint8Array(N * N);
   const bgGrad = c.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.62);
   bgGrad.addColorStop(0, 'rgb(246,220,163)'); bgGrad.addColorStop(0.6, '#d9a85e'); bgGrad.addColorStop(1, '#6b3d18');
-  const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, cand: null, best: 0, reactShape: null, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -271,14 +391,22 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     const steps = Math.floor((s.stuck - HELP_AFTER) / HELP_EVERY) + 1;
     return Math.max(Math.min(threshold, HELP_FLOOR), threshold - steps * HELP_STEP);
   }
+  // The player's hand shadow, frozen: this is what comes alive.
+  function makeSnap() {
+    if (!s.segs.length) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const g of s.segs) { x0 = Math.min(x0, g.ax, g.bx); x1 = Math.max(x1, g.ax, g.bx); y0 = Math.min(y0, g.ay, g.by); y1 = Math.max(y1, g.ay, g.by); }
+    return { segs: s.segs.map((g) => ({ ...g })), cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, size: Math.max(x1 - x0, y1 - y0, 1) };
+  }
+  // The wrong creature came alive: it reacts for REACT_TIME seconds, then the same scene is offered again.
+  function react(shape) {
+    if (!SCENES[s.i].reactions || !SCENES[s.i].reactions[shape]) return;
+    Object.assign(s, { phase: 'react', t: 0, hold: 0, cand: null, reactShape: shape, snap: makeSnap() });
+    sfx.creature && sfx.creature(shape);
+  }
   function succeed() {
-    let snap = null;
-    if (s.segs.length) {
-      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (const g of s.segs) { x0 = Math.min(x0, g.ax, g.bx); x1 = Math.max(x1, g.ax, g.bx); y0 = Math.min(y0, g.ay, g.by); y1 = Math.max(y1, g.ay, g.by); }
-      snap = { segs: s.segs.map((g) => ({ ...g })), cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, size: Math.max(x1 - x0, y1 - y0, 1) };
-    }
-    Object.assign(s, { phase: 'alive', t: 0, snap });
+    const snap = makeSnap();
+    Object.assign(s, { phase: 'alive', t: 0, snap, cand: null });
     sfx.chime && sfx.chime();
     sfx.creature && sfx.creature(SCENES[s.i].shape);
     s.callAgain = false;
@@ -309,6 +437,10 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     const paused = needsHands && s.lost > 0;
     if (s.phase === 'teach' && s.cooldown > 0) { s.cooldown -= dt; if (s.cooldown <= 0) begin(); return; }
     if (s.phase === 'intro' && s.t > INTRO_TIME) { s.phase = 'wait'; s.t = 0; }
+    if (s.phase === 'react') {
+      s.stuck += dt;
+      if (s.t > REACT_TIME) { s.phase = 'wait'; s.t = 0; s.hold = 0; s.cand = null; }
+    }
     if (s.phase === 'alive' && s.t > (SCENES[s.i].alive || ALIVE_TIME)) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
     if (s.phase === 'alive' && !s.callAgain && s.t > (SCENES[s.i].alive || ALIVE_TIME) * 0.55) { // the creature calls once more
       s.callAgain = true; sfx.creature && sfx.creature(SCENES[s.i].shape);
@@ -324,10 +456,31 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
       else { s.still += el; if (s.still >= TEACH_HOLD) saveTeach(s.mask, true); }
     } else if (s.phase === 'wait') {
       s.stuck += el;
-      s.score = bestMatch(s.mask, shapes[SCENES[s.i].shape]); s.angle = match.angle;
-      s.hold = s.score >= currentThreshold() ? s.hold + el : Math.max(0, s.hold - el * 2);
-      if (s.hold >= MATCH_HOLD) succeed();
+      // Score the hands against every shape. The best one, if it passes, is the creature that comes alive.
+      const want = SCENES[s.i].shape;
+      let best = 0, bestName = null, bestAngle = 0;
+      for (let k = 0; k < SHAPE_NAMES.length; k++) {
+        const name = SHAPE_NAMES[k];
+        if (!has(name)) continue;
+        const sc = bestMatch(s.mask, shapes[name]);
+        if (name === want) s.score = sc;
+        if (sc > best) { best = sc; bestName = name; bestAngle = match.angle; }
+      }
+      s.best = best; s.angle = bestAngle;
+      if (best >= currentThreshold()) {
+        if (bestName === s.cand) s.hold += el; else { s.cand = bestName; s.hold = el; }
+      } else {
+        s.hold = Math.max(0, s.hold - el * 2);
+        if (s.hold === 0) s.cand = null;
+      }
+      if (s.hold >= MATCH_HOLD) { if (s.cand === want) succeed(); else react(s.cand); }
     }
+  }
+
+  // Desktop: bring a creature to life without hands (keys 1, 2, 3 in main.js).
+  function tryShape(name) {
+    if (s.phase !== 'wait' && s.phase !== 'intro') return;
+    if (name === SCENES[s.i].shape) succeed(); else react(name);
   }
 
   // Desktop preview / debugging: pass the current step without hands.
@@ -370,7 +523,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   function gestureChip(name) {
     c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(96, 150, 58, 0, 7); c.fill();
     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
-    drawIcon(c, name, 96, 150, 96);
+    drawIcon(c, name, 96, 150, 100);
   }
   function textOn(str, y, size, color, weight = 500) {
     c.font = uiFont(size, weight); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
@@ -382,7 +535,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
 
   // A number that changes whenever something on the wall changes other than slow
   // ambient motion and the player's shadow: the phase and the quantised progress bars.
-  const PHASES = ['title', 'teach', 'intro', 'wait', 'alive', 'end'];
+  const PHASES = ['title', 'teach', 'intro', 'wait', 'alive', 'react', 'end'];
   let lastSig = NaN, lastPaint = -1;
   function signature() {
     let h = PHASES.indexOf(s.phase) * 1009 + s.i * 101 + s.hands * 11 + (s.supported === null ? 2 : s.supported ? 1 : 0);
@@ -424,7 +577,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   // the caller only re-uploads the texture then.
   function draw(time) {
     const sig = signature();
-    const animating = s.phase === 'alive' || s.phase === 'intro' || s.phase === 'end';
+    const animating = s.phase === 'alive' || s.phase === 'react' || s.phase === 'intro' || s.phase === 'end';
     if (!animating && sig === lastSig && time - lastPaint < AMBIENT && !shadowMoved()) return false;
     lastSig = sig; lastPaint = time; rememberShadow();
     paint(time);
@@ -451,7 +604,7 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 24, 'rgba(255,255,255,0.7)');
         for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked
           const on = h < s.hands;
-          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#ffffff' : '#747474', on ? '#148bfd' : '#5a5a5a');
+          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#ffffff' : '#747474', on ? '#148bfd' : '#5a5a5a', on ? 1 : 0.3);
         }
       }
     } else if (s.phase === 'teach') {
@@ -471,23 +624,33 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
       text('Home. The lamp can rest.', 200, 40, clamp01(s.t / 2) * 0.85);
     } else {
       const dur = scene.alive || ALIVE_TIME;
-      const p = s.phase === 'alive' ? clamp01(s.t / dur) : 0;
+      const alive = s.phase === 'alive', reacting = s.phase === 'react';
+      const p = alive ? clamp01(s.t / dur) : 0;
+      const sx = s.snap ? s.snap.cx : W / 2, sy = s.snap ? s.snap.cy : 220;
       let cr = null;
-      if (s.phase === 'alive') {
-        const sx = s.snap ? s.snap.cx : W / 2, sy = s.snap ? s.snap.cy : 220;
-        cr = scene.creature(p, sx, sy);
-        cr[1] += Math.sin(s.t * 9) * 5;
-      }
+      if (alive) { cr = scene.creature(p, sx, sy); cr[1] += Math.sin(s.t * 9) * 5; }
       scene.draw(c, p, time, cr);
-      if (s.phase === 'alive') text(scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
-      if (s.phase !== 'alive') {
+      if (alive) text(scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
+      if (reacting) {                       // the wrong creature, and what it does
+        const re = scene.reactions[s.reactShape];
+        const rp = clamp01(s.t / REACT_TIME), rc = re.move(rp, sx, sy);
+        rc[1] += Math.sin(s.t * 9) * 5;
+        text(re.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.5), ramp(REACT_TIME - s.t, 0, 0.5)));
+        if (s.snap) {
+          const k = Math.min(1, 110 / s.snap.size);
+          c.save(); c.translate(rc[0], rc[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
+          drawSegs(s.snap.segs); c.restore();
+        } else if (has(s.reactShape)) drawMask(shapes[s.reactShape][0], rc[0], rc[1], 110, INK);
+      } else if (!alive) {
+        // The prompt names the problem, never the creature. No hint in normal play: only after
+        // HELP_AFTER seconds without a correct answer does the target shape come back.
         text(scene.prompt, 46, 28, s.phase === 'intro' ? clamp01(s.t / 1.2) * 0.8 : 0.8);
-        // faint hint of the target shape; it darkens as the player gets close,
-        // and again when they have been stuck for a while
         const help = s.phase === 'wait' ? ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) : 0;
-        drawMask(shapes[scene.shape][0], W / 2, 215, 230, inkA(0.08 + 0.3 * clamp01(s.hold / MATCH_HOLD) + 0.22 * help));
-        if (help > 0) text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
-        gestureChip(scene.shape);
+        if (help > 0) {
+          drawMask(shapes[scene.shape][0], W / 2, 215, 230, inkA(0.1 + 0.3 * help));
+          text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
+          gestureChip(scene.shape);
+        }
       } else if (s.snap) {
         const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story
         c.save(); c.translate(cr[0], cr[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
@@ -509,5 +672,5 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     if (s.phase === 'teach') return s.teach;
     return s.phase === 'intro' || s.phase === 'wait' || s.phase === 'alive' ? SCENES[s.i].shape : null;
   }
-  return { update, draw, skip, target, state: s, threshold: currentThreshold };
+  return { update, draw, skip, tryShape, target, state: s, threshold: currentThreshold };
 }

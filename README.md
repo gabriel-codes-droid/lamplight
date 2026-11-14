@@ -2,12 +2,16 @@
 
 A seated, hands-only shadow-puppet story for Meta Quest (WebXR, three.js).
 
-A lamp glows behind you and throws your hands onto a paper wall. Make a bird, a
-dog or a rabbit with your bare hands and the shadow comes alive to help Mira
-walk home through the night: fetching her key across a river, chasing off a
-wolf, bringing down a lantern, herding sheep, opening a latched gate and
-digging under a wall. There are six scenes; a first playthrough takes about
-three minutes. No controllers, no menus, no build step.
+A lamp glows behind you and throws your hands onto a paper wall. Each scene shows a
+problem, never the answer: "A wolf blocks the path." "A wall stands before home." You
+decide which creature (bird, dog or rabbit) can solve it, and make that shape with your
+hands. The game scores your hands against all three shapes at once, and whichever passes
+comes alive. Pick wrongly and that creature reacts for three seconds (the rabbit sees the
+wolf and bolts, the dog jumps in the river and paddles back, the bird pecks at the wall and
+gives up) and the same scene is offered again. The last four scenes are two pairs that
+need two creatures in a row: the bird fetches the rope, then the dog pulls it; the bird
+fetches the key, then the rabbit digs under the gate. There are ten scenes, and a first
+playthrough takes about four minutes. No controllers, no menus, no build step.
 
 Made for the Meta VR Start Developer Competition.
 
@@ -16,13 +20,15 @@ Made for the Meta VR Start Developer Competition.
 There are none. Sit down, put the controllers away and use your hands.
 
 - **Title:** hold both hands up. The story starts once both are tracked.
-- **Each scene:** make the shape the wall asks for and hold it for about half a
-  second. Tilting your hands up to 20 degrees either way is fine. If you get
-  stuck, the faint hint on the wall darkens after 20 seconds and matching gets a
-  little easier every 10 seconds after that.
+- **Each scene:** read the problem, make the shape of the creature you think solves it
+  and hold it for about half a second. Tilting your hands up to 20 degrees either way is
+  fine. There is no hint in normal play. After 30 seconds without a correct answer the
+  target shape and its gesture icon appear, and matching gets a little easier every 10
+  seconds after that.
 - **Hands out of view:** the game pauses its timers and asks you to bring them
   back.
-- **No headset (desktop preview):** press Space to step through the story.
+- **No headset (desktop preview):** press Space to pass a step, or **1**, **2**, **3** to
+  bring a bird, dog or rabbit to life (a wrong one plays its reaction).
 
 Hand tracking must be on in the Quest settings. If the session has none, the
 wall says so.
@@ -98,7 +104,9 @@ view for a second, like a live session.
 - `shadow.js`: projects hand joints from the lamp onto the wall
 - `audio.js`: night ambience, chime and creature sounds, all synthesised
 - `capture.js`: `?capture` recorder and `?replay` player
-- `icons.js`: the bird, dog, rabbit and open-hand gesture icons (one set of data drawn as SVG on the page and on the wall canvas)
+- `icons.js`: the gesture icons. They use the hand illustrations from the Meta UI kit
+  (`assets/hands/`), with hand-tracking skeleton icons as a fallback
+- `outline.js`: traces a recorded shape into a smooth outline for the hint
 - `shapes.js`: the built-in hand shapes (paste your exported shapes here)
 
 ## Notes on performance

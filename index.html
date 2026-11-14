@@ -71,6 +71,8 @@
   .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 12px; border-radius: 8px; background: var(--cell); text-align: center; }
   .tile .ico { width: 96px; height: 96px; display: grid; place-items: center; }
+  .tile .ico { overflow: hidden; }
+  .tile .ico img { width: 100%; height: 100%; object-fit: contain; }
   .tile b { display: block; font-size: 14px; line-height: 20px; font-weight: 700; }
   .tile small { display: block; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); }
 

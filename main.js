@@ -8,7 +8,7 @@ import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import { DEFAULT_SHAPES } from './shapes.js';
 import { createAudio } from './audio.js';
 import { createShadow } from './shadow.js';
-import { iconSVG } from './icons.js';
+import { iconSVG, onHandSprite, handSpriteURL } from './icons.js';
 import { createRecorder, createReplay } from './capture.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
@@ -46,7 +46,10 @@ for (const [name, list] of Object.entries(hexShapes)) shapes[name] = list.map(de
 const teach = [...new Set([...names('record'), ...names('add')])];
 
 // ---- the page: gesture icons, and a button that shrinks the panel so the wall stays visible ----
-for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSVG(el.dataset.icon, el.clientWidth || 84);
+for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSVG(el.dataset.icon, 84);   // skeleton icons until the kit's hand sprites load
+onHandSprite((name) => {                                                                                // then the kit's hand illustrations
+  for (const el of document.querySelectorAll('[data-icon="' + name + '"]')) el.innerHTML = '<img src="' + handSpriteURL(name) + '" alt="">';
+});
 const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
 function setMinimised(min) {
   panel.classList.toggle('min', min);
@@ -159,7 +162,11 @@ if (downloadBtn && recorder) downloadBtn.hidden = false;
 downloadBtn?.addEventListener('click', () => recorder.download());
 renderer.xr.addEventListener('sessionend', () => { if (recorder) recorder.download(); });
 
-addEventListener('keydown', (e) => { if (e.code === 'Space') theatre.skip(); });
+addEventListener('keydown', (e) => {
+  if (e.code === 'Space') theatre.skip();
+  const n = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];            // desktop: 1, 2, 3 bring a bird, dog or rabbit to life
+  if (n !== undefined) theatre.tryShape(SHAPE_NAMES[n]);
+});
 
 const clock = new THREE.Clock();
 let hudAt = 0, hudFrames = 0;
