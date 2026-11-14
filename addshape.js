@@ -64,6 +64,8 @@ export function createAddShape(root, api) {
   iconRow.innerHTML = ANIMALS.map((a) => `<label><input type="radio" name="add-icon" value="${a}"><img src="${animalURL(a)}" alt="${a}"></label>`).join('') +
     '<label><input type="radio" name="add-icon" value="" checked><span>Aa</span></label>';
 
+  // a step that never answers becomes an error message instead of an endless spinner
+  const within = (p, ms, msg) => new Promise((ok, no) => { const t = setTimeout(() => no(new Error(msg)), ms); p.then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); no(e); }); });
   const show = (step) => { for (const k in steps) steps[k].hidden = k !== step; };
   const say = (msg, kind = '') => { status.textContent = msg; status.dataset.kind = kind; };
 
@@ -94,10 +96,11 @@ export function createAddShape(root, api) {
     icon = (root.querySelector('input[name="add-icon"]:checked') || {}).value || null;
     show('camera'); say('Starting the camera...');
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
-      video.srcObject = stream; await video.play();
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('this browser cannot open a camera here (the page must be on https)');
+      stream = await within(navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false }), 20000, 'The camera did not start. Is another app using it?');
+      video.srcObject = stream; await within(video.play(), 10000, 'The camera did not start.');
       say('Loading hand tracking (about 8 MB, first time only)...');
-      await ensureLandmarker();
+      await within(ensureLandmarker(), 60000, 'Hand tracking did not load. Check your connection and try again.');
     } catch (e) {
       say(e && e.name === 'NotAllowedError' ? 'Camera access was blocked. Allow the camera in your browser and try again.'
         : 'Could not start the camera or hand tracking: ' + (e && e.message ? e.message : e), 'error');
