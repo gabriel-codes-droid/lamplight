@@ -38,6 +38,7 @@ function load(key, src, convert) {
 }
 for (const n of ANIMALS) load('animal:' + n, animalURL(n));
 for (const n of GESTURES) load('gesture:' + n, gestureURL(n));
+load('girl', url('./assets/icons/girl.png'));
 load('hand', url('./assets/hands/hand.jpg'), turnToOutline);
 
 // Calls f(key) as each picture becomes ready, and right away for ones that already are.
@@ -80,4 +81,11 @@ export function drawGesture(c, name, cx, cy, size) {
 export function drawHand(c, cx, cy, size, alpha = 1) {
   const im = loaded.hand;
   if (im) fit(c, im, cx, cy, size, false, alpha);
+}
+// Mira, the girl in the story (a bust from the MetaPeople avatars); her bottom edge sits on (cx, bottom).
+export function drawGirl(c, cx, bottom, size) {
+  const im = loaded.girl;
+  if (!im) return false;
+  fit(c, im, cx, bottom - size / 2, size, false, 1);
+  return true;
 }

@@ -1,7 +1,7 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
-import { drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
+import { drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
 import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
@@ -62,10 +62,10 @@ function ground(c) {
 }
 function mira(c, x, time) {
   const y = GROUND - 2 + Math.sin(time * 2) * 1.5;
+  if (drawGirl(c, x, y + 8, 128)) return;      // the MetaPeople avatar; the drawn figure shows until it loads
   c.fillStyle = INK;
   c.beginPath(); c.arc(x, y - 58, 13, 0, 7); c.fill();
   c.beginPath(); c.moveTo(x, y - 48); c.lineTo(x - 17, y); c.lineTo(x + 17, y); c.fill();
-  c.beginPath(); c.moveTo(x - 12, y - 66); c.lineTo(x - 26, y - 50); c.lineTo(x - 8, y - 54); c.fill(); // hair
 }
 function key(c, x, y) {
   c.strokeStyle = INK; c.lineWidth = 5; c.lineCap = 'round';
