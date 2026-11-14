@@ -180,7 +180,7 @@ function chain(c, x0, x1, y) {
 // creature(p, sx, sy): where the living shadow is, p = 0..1 through the scene.
 // draw(c, p, time, cr): backdrop and actors; cr is the creature position or null.
 const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
-const FACES = { bird: 1, dog: 1, rabbit: 0, sheep: -1 };
+const FACES = { bird: 1, dog: 0, rabbit: 0, sheep: -1 };
 const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
 const R = (caption, pts) => ({ caption, move: flight(pts) });   // a wrong creature's 3 second reaction
 const SCENES = [
