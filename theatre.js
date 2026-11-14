@@ -653,7 +653,9 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
       ground(c);
       if (s.cooldown > 0) {
         text(s.savedLine, 52);
-        drawMask(shapes[s.teach][shapes[s.teach].length - 1], W / 2, 240, 240, 'rgba(22,12,6,0.35)');
+        c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(W / 2, 240, 118, 0, 7); c.fill();     // the saved creature, as its picture, not a blob
+        c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
+        drawAnimal(c, s.teach, W / 2, 240, 150, false, labelOf(s.teach));
       } else {
         text(s.teachLine, 46);
         text('Make the shape with your hands, then hold still.', 80, 20, 0.6);
