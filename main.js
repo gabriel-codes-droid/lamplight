@@ -165,6 +165,12 @@ wallTex.generateMipmaps = false;               // the wall is re-uploaded often:
 wallTex.minFilter = THREE.LinearFilter;
 const wall = new THREE.Mesh(new THREE.PlaneGeometry(WALL_W, WALL_H), new THREE.MeshBasicMaterial({ map: wallTex, transparent: true }));
 wall.position.set(0, WALL_Y, WALL_Z);
+// The room behind the wall: the kit's "Cyber City" environment on a big plane, dimmed so the wall stays the brightest thing.
+const room = new THREE.Mesh(new THREE.PlaneGeometry(10.4, 5.85), new THREE.MeshBasicMaterial({ color: 0x9a9a9a }));
+room.position.set(0, 1.5, WALL_Z - 1.8);
+new THREE.TextureLoader().load(new URL('./assets/backgrounds/city.jpg', import.meta.url).href, (tex) => {
+  tex.colorSpace = THREE.SRGBColorSpace; room.material.map = tex; room.material.needsUpdate = true; scene.add(room);
+});
 scene.add(wall);
 
 const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshStandardMaterial({ color: 0x1a100a, roughness: 1 }));
