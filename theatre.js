@@ -666,9 +666,13 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
         text(scene.prompt, 46, 28, s.phase === 'intro' ? clamp01(s.t / 1.2) * 0.8 : 0.8);
         const help = s.phase === 'wait' ? ease(ramp(s.stuck, HELP_AFTER, HELP_AFTER + 4)) : 0;
         if (help > 0) {
-          drawMask(shapes[scene.shape][0], W / 2, 215, 230, inkA(0.1 + 0.3 * help));
-          text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
-          gestureChip(scene.shape);
+          // the hint is the kit's gesture picture on a glass disc, not a silhouette blob
+          c.save(); c.globalAlpha = help;
+          c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(W / 2, 225, 118, 0, 7); c.fill();
+          c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
+          if (GESTURES.includes(scene.shape)) drawGesture(c, scene.shape, W / 2, 225, 190); else drawAnimal(c, scene.shape, W / 2, 225, 150, false, labelOf(scene.shape));
+          c.restore();
+          text('Make this gesture with your hands.', 80, 20, 0.6 * help);
         }
       } else {
         creatureAt(scene.shape, cr[0], cr[1]);
