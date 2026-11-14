@@ -60,7 +60,7 @@
   section { margin-bottom: 24px; }
 
   /* List Cells: 12px padding, 12px gap, primary 14/20 + secondary 12/16 */
-  ul.cells { list-style: none; margin: 0; padding: 0; border-radius: 16px; overflow: hidden; background: var(--cell); }
+  ul.cells { list-style: none; margin: 0; padding: 0; border-radius: 20px; overflow: hidden; background: var(--cell); }
   ul.cells li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px; font-size: 14px; line-height: 20px; font-weight: 500; }
   ul.cells li + li { border-top: 1px solid rgba(255, 255, 255, 0.10); }
   ul.cells .n { flex: none; width: 28px; height: 28px; border-radius: 1000px; background: rgba(255, 255, 255, 0.20);
@@ -69,10 +69,50 @@
 
   /* Tiles: 8px radius, primary + secondary label */
   .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .tile { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 12px; border-radius: 8px; background: var(--cell); text-align: center; }
+  .tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border-radius: 20px; background: var(--cell); text-align: center; }
   .tile .ico { width: 96px; height: 96px; display: grid; place-items: center; }
-  .tile .ico { overflow: hidden; }
   .tile .ico img { width: 100%; height: 100%; object-fit: contain; }
+  .tile .badge { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; padding: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+  .tile .badge img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .tile .letter { display: grid; place-items: center; width: 100%; height: 100%; font-size: 40px; font-weight: 700; color: var(--text); }
+  .tile .remove { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.12);
+    color: var(--text); font: 500 16px/1 var(--font); cursor: pointer; }
+  .tile .remove:hover { background: rgba(255, 255, 255, 0.25); }
+  .section-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+  .section-row h2 { margin: 0; }
+
+  /* the "Add a shape" dialog */
+  .modal { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .modal .card { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 28px; border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(65, 65, 65, 0.97), rgba(39, 39, 39, 0.97));
+    box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.10), inset -1px -1px 1px rgba(0, 0, 0, 0.10), 0 16px 48px rgba(0, 0, 0, 0.45); }
+  .modal h2 { font-size: 24px; line-height: 28px; letter-spacing: -0.5px; margin: 0; }
+  .modal .field { display: block; margin: 0 0 20px; font-size: 14px; line-height: 20px; font-weight: 700; }
+  .modal input[type="text"] { display: block; width: 100%; margin-top: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 16px; background: var(--field); color: var(--text);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10); font: 500 16px/20px var(--font); }
+  .icons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .icons label { position: relative; cursor: pointer; }
+  .icons input { position: absolute; opacity: 0; inset: 0; }
+  .icons img, .icons span { display: grid; place-items: center; width: 56px; height: 56px; padding: 6px; border-radius: 16px; background: var(--cell); object-fit: contain;
+    font-size: 16px; font-weight: 700; border: 2px solid transparent; }
+  .icons input:checked + img, .icons input:checked + span { border-color: rgba(255, 255, 255, 0.9); background: var(--cell-hover); }
+  .icons input:focus-visible + img, .icons input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+  .msg { min-height: 20px; margin: 0 0 16px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-2); }
+  .msg[data-kind="error"] { color: #f7818c; }
+  .msg[data-kind="ok"] { color: #59dd33; }
+  .cam { position: relative; margin: 20px 0 12px; border-radius: 20px; overflow: hidden; background: #000; }
+  .cam video, .cam canvas { display: block; width: 100%; transform: scaleX(-1); }
+  .cam canvas { position: absolute; inset: 0; height: 100%; }
+  progress { display: block; width: 100%; height: 8px; margin: 0 0 12px; border: 0; border-radius: 1000px; overflow: hidden; background: var(--cell); appearance: none; -webkit-appearance: none; }
+  progress::-webkit-progress-bar { background: var(--cell); }
+  progress::-webkit-progress-value { background: rgba(255, 255, 255, 0.9); border-radius: 1000px; }
+  progress::-moz-progress-bar { background: rgba(255, 255, 255, 0.9); }
+  .icon-btn { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text); font: 500 24px/1 var(--font); cursor: pointer; }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.10); }
+  button.primary { display: block; width: 100%; min-height: 48px; padding: 0 24px; border: 0; border-radius: 1000px; background: rgba(255, 255, 255, 0.90); color: #272727;
+    font: 700 14px/20px var(--font); cursor: pointer; }
+  button.primary:hover { background: rgba(255, 255, 255, 0.75); }
   .tile b { display: block; font-size: 14px; line-height: 20px; font-weight: 700; }
   .tile small { display: block; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); }
 
@@ -101,10 +141,10 @@
   details[open] summary::after { content: "\2212"; }
   details p { margin: 4px 0 12px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); }
   /* Search input: 8px radius, #00000026 fill, punched-in shadow */
-  textarea { width: 100%; height: 120px; padding: 12px 16px; border: 0; border-radius: 8px; resize: vertical; background: var(--field); color: var(--text);
+  textarea { width: 100%; height: 120px; padding: 14px 18px; border: 0; border-radius: 16px; resize: vertical; background: var(--field); color: var(--text);
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10);
     font: 500 12px/16px ui-monospace, Consolas, monospace; }
-  pre#debug { margin: 16px 0 0; padding: 12px 16px; border-radius: 8px; background: var(--field); color: var(--text-2);
+  pre#debug { margin: 16px 0 0; padding: 12px 16px; border-radius: 16px; background: var(--field); color: var(--text-2);
     box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10);
     font: 500 12px/16px ui-monospace, Consolas, monospace; white-space: pre-wrap; }
   #dl { margin-top: 12px; }
@@ -143,11 +183,11 @@
     </section>
 
     <section aria-labelledby="h-shapes">
-      <h2 id="h-shapes">Shapes you will make</h2>
-      <div class="tiles">
-        <div class="tile"><div class="ico" data-icon="bird"></div><div><b>Bird</b><small>Two hands, wings out</small></div></div>
-        <div class="tile"><div class="ico" data-icon="dog"></div><div><b>Dog</b><small>Thumb up, mouth open</small></div></div>
-        <div class="tile"><div class="ico" data-icon="rabbit"></div><div><b>Rabbit</b><small>Two fingers up</small></div></div>
+      <div class="section-row"><h2 id="h-shapes">Shapes you will make</h2><button id="add-open" class="chip">Add a shape</button></div>
+      <div class="tiles" id="tiles">
+        <div class="tile"><div class="ico"><img src="assets/gestures/bird.png" alt=""></div><div class="badge"><img src="assets/icons/bird.png" alt=""></div><div><b>Bird</b><small>Two hands, wings out</small></div></div>
+        <div class="tile"><div class="ico"><img src="assets/gestures/dog.png" alt=""></div><div class="badge"><img src="assets/icons/dog.png" alt=""></div><div><b>Dog</b><small>Hand flat, thumb up</small></div></div>
+        <div class="tile"><div class="ico"><img src="assets/gestures/rabbit.png" alt=""></div><div class="badge"><img src="assets/icons/rabbit.png" alt=""></div><div><b>Rabbit</b><small>Two fingers up</small></div></div>
       </div>
     </section>
 
@@ -164,6 +204,24 @@
     <button id="dl" class="chip" hidden>Download capture</button>
   </div>
 </main>
+<div id="add" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-title">
+  <div class="card">
+    <header><h2 id="add-title">Add a shape</h2><button class="icon-btn" data-close aria-label="Close">&times;</button></header>
+    <div data-step="form">
+      <p class="lead">Name a new creature, pick an icon, then make its gesture in front of your camera. The camera stays on this page; nothing is uploaded.</p>
+      <label class="field">Name<input type="text" id="add-name" maxlength="16" autocomplete="off" placeholder="Fox"></label>
+      <div class="field">Icon<div id="add-icons" class="icons"></div></div>
+      <p id="add-form-msg" class="msg" data-kind="error"></p>
+      <button id="add-next" class="primary">Open camera</button>
+    </div>
+    <div data-step="camera" hidden>
+      <div class="cam"><video id="add-video" playsinline muted></video><canvas id="add-overlay"></canvas></div>
+      <progress id="add-bar" max="1" value="0"></progress>
+      <p id="add-status" class="msg"></p>
+      <button class="chip" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
 <script type="module" src="./main.js"></script>
 </body>
 </html>

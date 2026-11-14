@@ -73,6 +73,18 @@ more forgiving. Tilts of up to 20 degrees are handled automatically.
 | `?start=4`        | Start at scene 4 instead of scene 1. |
 | `?debug`          | Show the phase, target, match score and frame rate on the page. |
 
+## Add your own shape
+
+On the page, press **Add a shape**. Name the creature, pick an icon (or a letter), then make
+its gesture in front of the camera and hold still for about 2.5 seconds. If the gesture is
+too close to one the game already has, it asks for a different one. Saved shapes are matched
+together with the built-in ones, and a wrong one plays a generic reaction. The camera is
+used only on that page and nothing is uploaded; hand tracking (MediaPipe) and its model are
+downloaded from a CDN the first time. The Quest does not give web pages its camera, so use a
+laptop or phone, then copy the **Shapes** box into `shapes.js` (both `DEFAULT_SHAPES` and
+`DEFAULT_CUSTOM`) so the headset gets the shape too. `?same=0.75` changes how alike two
+gestures must be to count as the same.
+
 ## Tune matching without a headset
 
 Record your hands once, then replay them on a desktop as often as you like.
@@ -104,9 +116,10 @@ view for a second, like a live session.
 - `shadow.js`: projects hand joints from the lamp onto the wall
 - `audio.js`: night ambience, chime and creature sounds, all synthesised
 - `capture.js`: `?capture` recorder and `?replay` player
-- `icons.js`: the gesture icons. They use the hand illustrations from the Meta UI kit
-  (`assets/hands/`), with hand-tracking skeleton icons as a fallback
+- `icons.js`: the pictures, all from the Meta UI kit: hand gestures (`assets/gestures/`),
+  animal avatars (`assets/icons/`) and the title hand (`assets/hands/`)
 - `outline.js`: traces a recorded shape into a smooth outline for the hint
+- `addshape.js`: the "Add a shape" camera dialog (MediaPipe Hands, loaded from a CDN on demand)
 - `shapes.js`: the built-in hand shapes (paste your exported shapes here)
 
 ## Notes on performance

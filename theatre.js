@@ -1,7 +1,7 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
-import { drawIcon } from './icons.js';
+import { drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
 import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
@@ -126,12 +126,8 @@ function lantern(c, x, y, glow, chain) { // x, y = centre of the glass
   c.fillStyle = glow ? '#ffdf9a' : PAPER; c.fillRect(x - 8, y - 9, 16, 18);
   c.fillStyle = INK; c.fillRect(x - 1, y - 9, 2, 18);
 }
-function sheep(c, x, y) {       // faces right; y is where the hooves touch
-  c.fillStyle = INK;
-  c.beginPath(); c.ellipse(x, y - 26, 25, 18, 0, 0, 7); c.fill();                 // fleece
-  c.beginPath(); c.arc(x + 27, y - 32, 9, 0, 7); c.fill();                        // head
-  c.beginPath(); c.moveTo(x + 24, y - 38); c.lineTo(x + 18, y - 48); c.lineTo(x + 31, y - 40); c.fill(); // ear
-  c.fillRect(x - 14, y - 12, 5, 13); c.fillRect(x + 9, y - 12, 5, 13);
+function sheep(c, x, y) {       // the kit's sheep icon; it faces left, so flip it to face the pen
+  drawAnimal(c, 'sheep', x, y - 34, 68, true);
 }
 function pen(c, x0, x1) {
   c.fillStyle = INK;
@@ -182,6 +178,7 @@ function chain(c, x0, x1, y) {
 // creature(p, sx, sy): where the living shadow is, p = 0..1 through the scene.
 // draw(c, p, time, cr): backdrop and actors; cr is the creature position or null.
 const SHEEP_FROM = [430, 500, 575, 650], SHEEP_TO = [835, 878, 921, 964];
+const FACES = { bird: 1, dog: 1, rabbit: 0, sheep: -1 };
 const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
 const R = (caption, pts) => ({ caption, move: flight(pts) });   // a wrong creature's 3 second reaction
 const SCENES = [
@@ -365,14 +362,31 @@ export const SHAPE_NAMES = [...new Set(SCENES.map((sc) => sc.shape))];
 
 // shapes: { name: [mask, mask, ...] }. Several templates per shape are allowed;
 // teach: names to (re)teach this run, on top of any shape that has no template yet.
-export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
+export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0, threshold = 0.55, onShapeSaved = () => {}, sfx = {} }) {
   const c = ctx;
   const has = (n) => !!(shapes[n] && shapes[n].length);
+  // Shapes the player added themselves: { name: { label, icon } }. They are matched like the built-in ones.
+  const customMeta = {};
+  const allNames = [...SHAPE_NAMES];
+  const labelOf = (n) => (customMeta[n] && customMeta[n].label) || n;
+  const faces = (n) => (n in FACES ? FACES[n] : customMeta[n] && customMeta[n].icon in FACES ? FACES[customMeta[n].icon] : 1);
+  function addCustom(name, meta, mask) {
+    customMeta[name] = meta; registerCreature(name, meta.icon);
+    if (!allNames.includes(name)) allNames.push(name);
+    if (mask) { (shapes[name] || (shapes[name] = [])).push(mask); variantsOf(mask); }
+  }
+  for (const n in custom) { addCustom(n, custom[n]); if (shapes[n]) for (const m of shapes[n]) variantsOf(m); }
+  function removeCustom(name) {
+    delete customMeta[name]; delete shapes[name];
+    const i = allNames.indexOf(name); if (i >= 0 && !SHAPE_NAMES.includes(name)) allNames.splice(i, 1);
+  }
+  const generic = {};
+  const genericReaction = (n) => generic[n] || (generic[n] = R(`The ${labelOf(n)} wanders in, looks around and wanders off.`, [[0, 0, 0], [0.4, 440, 395], [0.7, 470, 395], [1, -100, 395]]));
   for (const n of SHAPE_NAMES) if (shapes[n]) for (const m of shapes[n]) variantsOf(m); // build tilted copies now, not mid-game
   const maskBuf = new Uint8Array(N * N), refBuf = new Uint8Array(N * N);
   const bgGrad = c.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.62);
   bgGrad.addColorStop(0, 'rgb(246,220,163)'); bgGrad.addColorStop(0.6, '#d9a85e'); bgGrad.addColorStop(1, '#6b3d18');
-  const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, cand: null, best: 0, reactShape: null, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
+  const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, cand: null, best: 0, lastX: null, facing: 1, reactShape: null, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
               ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
   const toTeach = teach.slice();
 
@@ -400,13 +414,12 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
   }
   // The wrong creature came alive: it reacts for REACT_TIME seconds, then the same scene is offered again.
   function react(shape) {
-    if (!SCENES[s.i].reactions || !SCENES[s.i].reactions[shape]) return;
-    Object.assign(s, { phase: 'react', t: 0, hold: 0, cand: null, reactShape: shape, snap: makeSnap() });
+    Object.assign(s, { phase: 'react', t: 0, hold: 0, cand: null, reactShape: shape, snap: makeSnap(), lastX: null });
     sfx.creature && sfx.creature(shape);
   }
   function succeed() {
     const snap = makeSnap();
-    Object.assign(s, { phase: 'alive', t: 0, snap, cand: null });
+    Object.assign(s, { phase: 'alive', t: 0, snap, cand: null, lastX: null });
     sfx.chime && sfx.chime();
     sfx.creature && sfx.creature(SCENES[s.i].shape);
     s.callAgain = false;
@@ -459,8 +472,8 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
       // Score the hands against every shape. The best one, if it passes, is the creature that comes alive.
       const want = SCENES[s.i].shape;
       let best = 0, bestName = null, bestAngle = 0;
-      for (let k = 0; k < SHAPE_NAMES.length; k++) {
-        const name = SHAPE_NAMES[k];
+      for (let k = 0; k < allNames.length; k++) {
+        const name = allNames[k];
         if (!has(name)) continue;
         const sc = bestMatch(s.mask, shapes[name]);
         if (name === want) s.score = sc;
@@ -519,11 +532,19 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     c.fill();
     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();   // beveled edge
   }
+  // An animal icon at (x, y), turned the way it is moving.
+  function creatureAt(name, x, y) {
+    if (s.lastX === null) s.lastX = x;
+    const dx = x - s.lastX; s.lastX = x;
+    if (Math.abs(dx) > 0.3) s.facing = dx > 0 ? 1 : -1;
+    const f = faces(name);
+    drawAnimal(c, name, x, y, 104, f !== 0 && s.facing !== f, labelOf(name));
+  }
   // A round chip with the gesture to make, top left of the wall.
   function gestureChip(name) {
     c.fillStyle = CHIP_GRAD; c.beginPath(); c.arc(96, 150, 58, 0, 7); c.fill();
     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();
-    drawIcon(c, name, 96, 150, 100);
+    if (GESTURES.includes(name)) drawGesture(c, name, 96, 150, 92); else drawAnimal(c, name, 96, 150, 80, false, labelOf(name));
   }
   function textOn(str, y, size, color, weight = 500) {
     c.font = uiFont(size, weight); c.textAlign = 'center'; c.fillStyle = color; c.fillText(str, W / 2, y);
@@ -604,7 +625,9 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
         textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 24, 'rgba(255,255,255,0.7)');
         for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked
           const on = h < s.hands;
-          drawIcon(c, 'hand', W / 2 + (h ? 56 : -56), 342, 78, on ? '#ffffff' : '#747474', on ? '#148bfd' : '#5a5a5a', on ? 1 : 0.3);
+          const hx = W / 2 + (h ? 56 : -56);
+          drawHand(c, hx, 336, 72, on ? 1 : 0.3);
+          c.fillStyle = on ? '#148bfd' : 'rgba(255,255,255,0.25)'; c.beginPath(); c.arc(hx, 382, 5, 0, 7); c.fill();
         }
       }
     } else if (s.phase === 'teach') {
@@ -632,15 +655,11 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
       scene.draw(c, p, time, cr);
       if (alive) text(scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
       if (reacting) {                       // the wrong creature, and what it does
-        const re = scene.reactions[s.reactShape];
+        const re = (scene.reactions && scene.reactions[s.reactShape]) || genericReaction(s.reactShape);
         const rp = clamp01(s.t / REACT_TIME), rc = re.move(rp, sx, sy);
         rc[1] += Math.sin(s.t * 9) * 5;
         text(re.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.5), ramp(REACT_TIME - s.t, 0, 0.5)));
-        if (s.snap) {
-          const k = Math.min(1, 110 / s.snap.size);
-          c.save(); c.translate(rc[0], rc[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
-          drawSegs(s.snap.segs); c.restore();
-        } else if (has(s.reactShape)) drawMask(shapes[s.reactShape][0], rc[0], rc[1], 110, INK);
+        creatureAt(s.reactShape, rc[0], rc[1]);
       } else if (!alive) {
         // The prompt names the problem, never the creature. No hint in normal play: only after
         // HELP_AFTER seconds without a correct answer does the target shape come back.
@@ -651,12 +670,8 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
           text('Follow the dark shape with your hands.', 80, 20, 0.6 * help);
           gestureChip(scene.shape);
         }
-      } else if (s.snap) {
-        const k = 1 + (Math.min(1, 110 / s.snap.size) - 1) * ease(ramp(p, 0, 0.25)); // shrink into the story
-        c.save(); c.translate(cr[0], cr[1]); c.scale(k, k); c.translate(-s.snap.cx, -s.snap.cy);
-        drawSegs(s.snap.segs); c.restore();
       } else {
-        drawMask(shapes[scene.shape][0], cr[0], cr[1], 110, INK);
+        creatureAt(scene.shape, cr[0], cr[1]);
       }
     }
     if (s.lost > LOST_SHOW && (s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0))) {
@@ -672,5 +687,5 @@ export function createTheatre({ ctx, shapes, teach = [], start = 0, threshold = 
     if (s.phase === 'teach') return s.teach;
     return s.phase === 'intro' || s.phase === 'wait' || s.phase === 'alive' ? SCENES[s.i].shape : null;
   }
-  return { update, draw, skip, tryShape, target, state: s, threshold: currentThreshold };
+  return { update, draw, skip, tryShape, addCustom, removeCustom, shapeNames: () => allNames, target, state: s, threshold: currentThreshold };
 }

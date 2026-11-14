@@ -5,10 +5,11 @@ import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRHandModelFactory } from 'three/addons/webxr/XRHandModelFactory.js';
 import { encode, decode } from './matcher.js';
 import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
-import { DEFAULT_SHAPES } from './shapes.js';
+import * as SHAPES from './shapes.js';
+import { createAddShape } from './addshape.js';
+import { animalURL } from './icons.js';
 import { createAudio } from './audio.js';
 import { createShadow } from './shadow.js';
-import { iconSVG, onHandSprite, handSpriteURL } from './icons.js';
 import { createRecorder, createReplay } from './capture.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
@@ -32,10 +33,17 @@ const STORE = 'lamplight-shapes';
 let stored = {};
 try { stored = JSON.parse(localStorage.getItem(STORE) || '{}'); } catch (e) { /* storage unavailable */ }
 const asList = (v) => (Array.isArray(v) ? v.filter((x) => typeof x === 'string') : typeof v === 'string' ? [v] : []);
+const DEFAULT_SHAPES = SHAPES.DEFAULT_SHAPES;
+// creatures the player added: { name: { label, icon } }, from shapes.js and from this device
+const CUSTOM_STORE = 'lamplight-custom';
+let customStored = {};
+try { customStored = JSON.parse(localStorage.getItem(CUSTOM_STORE) || '{}'); } catch (e) { /* storage unavailable */ }
+const customMeta = { ...(SHAPES.DEFAULT_CUSTOM || {}), ...customStored };
 const names = (key) => {                       // which shapes a ?key or ?key=a,b selects
   if (!params.has(key)) return [];
-  const list = params.get(key).split(',').map((n) => n.trim()).filter((n) => SHAPE_NAMES.includes(n));
-  return list.length ? list : SHAPE_NAMES;
+  const all = [...SHAPE_NAMES, ...Object.keys(customMeta)];
+  const list = params.get(key).split(',').map((n) => n.trim()).filter((n) => all.includes(n));
+  return list.length ? list : all;
 };
 const hexShapes = {};
 for (const name of new Set([...Object.keys(DEFAULT_SHAPES), ...Object.keys(stored)]))
@@ -46,10 +54,6 @@ for (const [name, list] of Object.entries(hexShapes)) shapes[name] = list.map(de
 const teach = [...new Set([...names('record'), ...names('add')])];
 
 // ---- the page: gesture icons, and a button that shrinks the panel so the wall stays visible ----
-for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = iconSVG(el.dataset.icon, 84);   // skeleton icons until the kit's hand sprites load
-onHandSprite((name) => {                                                                                // then the kit's hand illustrations
-  for (const el of document.querySelectorAll('[data-icon="' + name + '"]')) el.innerHTML = '<img src="' + handSpriteURL(name) + '" alt="">';
-});
 const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
 function setMinimised(min) {
   panel.classList.toggle('min', min);
@@ -61,7 +65,7 @@ if (debug) setMinimised(true);   // replaying or debugging: keep the wall in vie
 
 const exportBox = document.getElementById('export');
 function showExport() {
-  if (exportBox) exportBox.value = `export const DEFAULT_SHAPES = ${JSON.stringify(hexShapes, null, 2)};`;
+  if (exportBox) exportBox.value = `export const DEFAULT_SHAPES = ${JSON.stringify(hexShapes, null, 2)};\nexport const DEFAULT_CUSTOM = ${JSON.stringify(customMeta, null, 2)};`;
 }
 showExport();
 document.getElementById('copy')?.addEventListener('click', () => {
@@ -73,17 +77,50 @@ const sfx = createAudio();
 const wake = sfx.wake;
 addEventListener('pointerdown', wake); addEventListener('keydown', wake);
 
+function saveHex(name, mask) {                  // remember a template on this device
+  hexShapes[name] = [...(hexShapes[name] || []), encode(mask)]; stored[name] = hexShapes[name].slice();
+  try { localStorage.setItem(STORE, JSON.stringify(stored)); } catch (e) { /* storage unavailable */ }
+  showExport();
+}
+
 // ---- the wall is a canvas ----
 const canvas = document.createElement('canvas');
 canvas.width = W; canvas.height = H;
 const theatre = createTheatre({
-  ctx: canvas.getContext('2d'), shapes, teach, start: startScene, threshold, sfx,
-  onShapeSaved(name, mask) {
-    hexShapes[name] = [...(hexShapes[name] || []), encode(mask)]; stored[name] = hexShapes[name].slice();
-    try { localStorage.setItem(STORE, JSON.stringify(stored)); } catch (e) { /* storage unavailable */ }
-    showExport();
+  ctx: canvas.getContext('2d'), shapes, custom: customMeta, teach, start: startScene, threshold, sfx,
+  onShapeSaved(name, mask) { saveHex(name, mask); },
+});
+
+// ---- "Add a shape": camera dialog, saved creatures listed as extra tiles ----
+const tilesEl = document.getElementById('tiles');
+function renderCustom() {
+  for (const el of tilesEl.querySelectorAll('.tile.custom')) el.remove();
+  for (const [name, meta] of Object.entries(customMeta)) {
+    const tile = document.createElement('div'); tile.className = 'tile custom';
+    const pic = meta.icon ? '<img src="' + animalURL(meta.icon) + '" alt="">' : '<span class="letter"></span>';
+    tile.innerHTML = '<div class="ico">' + pic + '</div><div><b></b><small>Your gesture</small></div><button class="remove" aria-label="Remove"></button>';
+    tile.querySelector('b').textContent = meta.label;
+    const letter = tile.querySelector('.letter'); if (letter) letter.textContent = meta.label.charAt(0).toUpperCase();
+    tile.querySelector('.remove').textContent = '\u00d7';
+    tile.querySelector('.remove').addEventListener('click', () => {
+      delete customMeta[name]; delete hexShapes[name]; delete stored[name]; delete customStored[name]; theatre.removeCustom(name);
+      try { localStorage.setItem(STORE, JSON.stringify(stored)); localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
+      showExport(); renderCustom();
+    });
+    tilesEl.appendChild(tile);
+  }
+}
+const addDialog = createAddShape(document.getElementById('add'), {
+  existing: () => theatre.shapeNames().filter((n) => shapes[n] && shapes[n].length)
+    .map((n) => ({ name: n, label: (customMeta[n] && customMeta[n].label) || n, templates: shapes[n] })),
+  save({ name, label, icon, mask }) {
+    customMeta[name] = { label, icon }; customStored[name] = customMeta[name];
+    try { localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
+    saveHex(name, mask); theatre.addCustom(name, customMeta[name], mask); renderCustom();
   },
 });
+document.getElementById('add-open').addEventListener('click', () => addDialog.open());
+renderCustom();
 
 // ---- three.js scene ----
 const renderer = new THREE.WebGLRenderer({ antialias: true });
