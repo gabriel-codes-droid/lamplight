@@ -525,7 +525,12 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
   function drawDots(segs) {
     if (!s.live && !segs.length) return;
     const on = s.cand !== null && s.cand !== undefined;
-    c.fillStyle = on ? '#148bfd' : 'rgba(255,255,255,0.92)'; c.strokeStyle = 'rgba(20,12,6,0.55)'; c.lineWidth = 1.5;
+    const col = on ? '#148bfd' : 'rgba(255,255,255,0.92)';
+    c.strokeStyle = col; c.lineWidth = 2.5; c.lineCap = 'round';        // thin lines join the joints, like the hand skeleton
+    c.beginPath();
+    for (let i = 0; i < segs.length; i++) { const g = segs[i]; if (g.joint === false) continue; c.moveTo(g.ax, g.ay); c.lineTo(g.bx, g.by); }
+    c.stroke();
+    c.fillStyle = col; c.strokeStyle = 'rgba(20,12,6,0.55)'; c.lineWidth = 1.5;
     c.beginPath();
     for (let i = 0; i < segs.length; i++) {
       const g = segs[i];
