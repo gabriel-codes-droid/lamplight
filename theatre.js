@@ -530,7 +530,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     for (let i = 0; i < segs.length; i++) {
       const g = segs[i];
       c.moveTo(g.ax + 5.5, g.ay); c.arc(g.ax, g.ay, 5.5, 0, 7);
-      c.moveTo(g.bx + 5.5, g.by); c.arc(g.bx, g.by, 5.5, 0, 7);
+      if (g.joint !== false) { c.moveTo(g.bx + 5.5, g.by); c.arc(g.bx, g.by, 5.5, 0, 7); }   // not at the end of the forearm stub
     }
     c.fill(); c.stroke();
   }

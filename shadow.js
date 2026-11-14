@@ -37,10 +37,10 @@ export function createShadow(cfg) {
     out.k = t * ppm;                             // metres -> pixels at this depth
     return true;
   }
-  function bone(segs, a, b, radius) {
+  function bone(segs, a, b, radius, joint = true) {   // joint: false when the far end is not a real joint (the forearm stub)
     if (!project(a, pa) || !project(b, pb)) return;
-    const g = pool[used++] || (pool[used - 1] = { ax: 0, ay: 0, bx: 0, by: 0, r: 0 });
-    g.ax = pa.x; g.ay = pa.y; g.bx = pb.x; g.by = pb.y; g.r = radius * (pa.k + pb.k) / 2;
+    const g = pool[used++] || (pool[used - 1] = { ax: 0, ay: 0, bx: 0, by: 0, r: 0, joint: true });
+    g.ax = pa.x; g.ay = pa.y; g.bx = pb.x; g.by = pb.y; g.r = radius * (pa.k + pb.k) / 2; g.joint = joint;
     segs.push(g);
   }
 
@@ -72,7 +72,7 @@ export function createShadow(cfg) {
         const w = wrist.position, m = mid.position;
         const dx = w.x - m.x, dy = w.y - m.y, dz = w.z - m.z, len = Math.hypot(dx, dy, dz) || 1;
         stub.x = w.x + dx / len * 0.22; stub.y = w.y + dy / len * 0.22; stub.z = w.z + dz / len * 0.22;
-        bone(segs, w, stub, 0.027);
+        bone(segs, w, stub, 0.027, false);
       }
     }
     return tracked;
