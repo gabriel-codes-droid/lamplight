@@ -1,7 +1,7 @@
 // The shadow theatre: game state and all 2D drawing. It only needs a canvas
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
-import { drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
+import { drawWolf, drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
 import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
@@ -87,6 +87,7 @@ function river(c, time) {
 }
 function wolf(c, x) {
   const y = GROUND;
+  if (drawWolf(c, x, y + 6, 120, true)) return;      // the kit's wolf; the drawn one shows until it loads
   c.fillStyle = INK;
   c.beginPath(); c.ellipse(x, y - 34, 50, 22, 0, 0, 7); c.fill();           // body
   c.beginPath(); c.ellipse(x - 52, y - 54, 22, 15, -0.3, 0, 7); c.fill();   // head

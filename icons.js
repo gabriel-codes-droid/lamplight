@@ -38,6 +38,7 @@ function load(key, src, convert) {
 }
 for (const n of ANIMALS) load('animal:' + n, animalURL(n));
 for (const n of GESTURES) load('gesture:' + n, gestureURL(n));
+load('wolf', url('./assets/icons/wolf.png'));
 load('girl', url('./assets/icons/girl.png'));
 load('hand', url('./assets/hands/hand.jpg'), turnToOutline);
 
@@ -87,5 +88,12 @@ export function drawGirl(c, cx, bottom, size) {
   const im = loaded.girl;
   if (!im) return false;
   fit(c, im, cx, bottom - size / 2, size, false, 1);
+  return true;
+}
+// The wolf in the story (an animal picture that is not a creature the player can make).
+export function drawWolf(c, cx, bottom, size, flip = false) {
+  const im = loaded.wolf;
+  if (!im) return false;
+  fit(c, im, cx, bottom - size / 2, size, flip, 1);
   return true;
 }
