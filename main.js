@@ -25,8 +25,6 @@ const threshold = parseFloat(params.get('th')) || 0.55; // ?th=0.5 makes matchin
 const startScene = Math.max(0, (parseInt(params.get('start'), 10) || 1) - 1); // ?start=4 begins at scene 4
 const replayFile = params.get('replay');                // ?replay=captures/x.json plays a capture back
 const recorder = params.has('capture') ? createRecorder() : null; // ?capture records the hands
-// DEV ONLY (remove before release): ?remote reloads the page when /ctl.txt on the dev server changes
-if (params.has('remote')) { let last = null; setInterval(async () => { try { const t = (await (await fetch('/ctl.txt', { cache: 'no-store' })).text()).trim(); if (last === null) { last = t; return; } if (t !== last) { last = t; if (t) location.search = t; } } catch (e) { /* no dev server */ } }, 1000); }
 const debug = params.has('debug') || !!replayFile || !!recorder;  // on-page readout of the matcher
 
 // ---- shapes: built-in ones, overridden by ones taught on this device ----

@@ -87,6 +87,21 @@ laptop or phone, then copy the **Shapes** box into `shapes.js` (both `DEFAULT_SH
 `DEFAULT_CUSTOM`) so the headset gets the shape too. `?same=0.75` changes how alike two
 gestures must be to count as the same.
 
+## Play with your webcam (no headset)
+
+Open the page with `?cam`. Your webcam reads your hands (MediaPipe, in the browser; nothing is
+uploaded) and they drive the wall shadow, shown as a dotted skeleton. Use `?cam&record` to teach
+the three shapes with your own hands, `?cam&nopreview` to hide the small camera picture, and
+`&debug` to put the matcher readout on the wall. Shapes taught this way come from the webcam,
+not a headset, so record the ones in `shapes.js` on a Quest.
+
+## Add a creature without a camera
+
+`?new=kangaroo&ability=jump&icon=718` starts the teaching screen for a new creature (in a headset
+or an emulator), saves it with its ability, and puts it in the Shapes export box. Abilities: fly,
+swim, climb, dig, jump, squeeze, strong, scare, attract, herd. `icon` is a built-in animal or a
+kit picture such as `e718`.
+
 ## Tune matching without a headset
 
 Record your hands once, then replay them on a desktop as often as you like.
@@ -121,6 +136,8 @@ view for a second, like a live session.
 - `icons.js`: the pictures, all from the Meta UI kit: hand gestures (`assets/gestures/`),
   animal avatars (`assets/icons/`) and the title hand (`assets/hands/`)
 - `outline.js`: traces a recorded shape into a smooth outline for the hint
+- `camhands.js`: `?cam`, webcam hands as the wall shadow
+- `traits.js`, `emoji.js`: the abilities a creature can have, and the kit pictures to choose from
 - `addshape.js`: the "Add a shape" camera dialog (MediaPipe Hands, loaded from a CDN on demand)
 - `shapes.js`: the built-in hand shapes (paste your exported shapes here)
 
