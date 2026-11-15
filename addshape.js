@@ -5,6 +5,8 @@
 // Everything stays in the browser: video frames are never sent anywhere.
 import { rasterize, bestMatch, iou, N } from './matcher.js';
 import { ANIMALS, animalURL } from './icons.js';
+import { TRAITS } from './traits.js';
+import { EMOJI } from './emoji.js';
 
 const MP_VERSION = '0.10.14';
 const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VERSION;
@@ -60,16 +62,21 @@ export function createAddShape(root, api) {
   let samples = [], dots = null, stream = null, landmarker = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
   const buf = new Uint8Array(N * N), ref = new Uint8Array(N * N);
 
-  // icon choices: the kit's animals, or just a letter
-  iconRow.innerHTML = ANIMALS.map((a) => `<label><input type="radio" name="add-icon" value="${a}"><img src="${animalURL(a)}" alt="${a}"></label>`).join('') +
-    '<label><input type="radio" name="add-icon" value="" checked><span>Aa</span></label>';
+  const traitRow = $('#add-traits'), noteInput = $('#add-note');
+  traitRow.innerHTML = TRAITS.map((t) => `<label><input type="checkbox" value="${t.key}"><span>${t.label}<small>${t.note}</small></span></label>`).join('');
+  let traits = [], note = '';
+
+  // icon choices: "my hand drawing" first (the dotted skeleton of the gesture, used when no picture fits),
+  // then the kit's four animals and every animal/emoji picture from the kit
+  iconRow.innerHTML = '<label><input type="radio" name="add-icon" value="" checked><span class="skel" title="Use the dotted hand from my gesture">Hand<br>dots</span></label>' +
+    [...ANIMALS, ...EMOJI].map((a) => `<label><input type="radio" name="add-icon" value="${a}"><img src="${animalURL(a)}" alt="${a}" loading="lazy" width="56" height="56"></label>`).join('');
 
   // a step that never answers becomes an error message instead of an endless spinner
   const within = (p, ms, msg) => new Promise((ok, no) => { const t = setTimeout(() => no(new Error(msg)), ms); p.then((v) => { clearTimeout(t); ok(v); }, (e) => { clearTimeout(t); no(e); }); });
   const show = (step) => { for (const k in steps) steps[k].hidden = k !== step; };
   const say = (msg, kind = '') => { status.textContent = msg; status.dataset.kind = kind; };
 
-  function open() { root.hidden = false; show('form'); formMsg.textContent = ''; nameInput.value = ''; nameInput.focus(); }
+  function open() { root.hidden = false; show('form'); formMsg.textContent = ''; nameInput.value = ''; noteInput.value = ''; for (const b of traitRow.querySelectorAll('input')) b.checked = false; nameInput.focus(); }
   function close() {
     cancelAnimationFrame(raf); raf = 0;
     if (stream) { for (const t of stream.getTracks()) t.stop(); stream = null; }
@@ -81,7 +88,7 @@ export function createAddShape(root, api) {
     const { FilesetResolver, HandLandmarker } = await import(MP_BASE + '/vision_bundle.mjs');
     const vision = await FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
     landmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: MP_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 2,
+      baseOptions: { modelAssetPath: MP_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 6,
     });
     return landmarker;
   }
@@ -93,6 +100,8 @@ export function createAddShape(root, api) {
     if (api.existing().some((e) => e.name === name || e.label.toLowerCase() === label.toLowerCase())) {
       formMsg.textContent = 'A shape called "' + label + '" already exists. Pick another name.'; return;
     }
+    traits = [...traitRow.querySelectorAll('input:checked')].map((b) => b.value);
+    note = noteInput.value.trim();
     icon = (root.querySelector('input[name="add-icon"]:checked') || {}).value || null;
     show('camera'); say('Starting the camera...');
     try {
@@ -154,7 +163,7 @@ export function createAddShape(root, api) {
       say('Got ' + samples.length + ' of ' + SAMPLES + '. Lower your hand, then make the same gesture again, a little differently.', 'ok');
       still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 2000); return;
     }
-    api.save({ name, label, icon, masks: samples, dots });
+    api.save({ name, label, icon, masks: samples, dots, traits, note });
     say('Saved "' + label + '". It is now part of the game.', 'ok');
     cancelAnimationFrame(raf); raf = 0;
     setTimeout(close, 1400);

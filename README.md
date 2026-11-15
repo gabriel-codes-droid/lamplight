@@ -75,8 +75,10 @@ more forgiving. Tilts of up to 20 degrees are handled automatically.
 
 ## Add your own shape
 
-On the page, press **Add a shape**. Name the creature, pick an icon (or a letter), then make
-its gesture in front of the camera and hold still for about 2.5 seconds, three times (so it is recognised from slightly different poses). The dotted hand is stored with the shape. If the gesture is
+On the page, press **Add a shape**. Name the creature, pick a picture (any of the kit's animals, or keep **Hand dots** and
+the creature is shown as the dotted skeleton of its own gesture), tick what it is naturally good at
+(flies, swims, climbs, digs, jumps, squeezes through gaps, strong, fierce, herds), then make
+its gesture in front of the camera and hold still for about 2.5 seconds, three times. Every hand the camera sees is used, not just one. Each story problem needs certain abilities, so a creature you add solves any problem its ticked abilities fit, and only wanders in otherwise (so it is recognised from slightly different poses). The dotted hand is stored with the shape. If the gesture is
 too close to one the game already has, it asks for a different one. Saved shapes are matched
 together with the built-in ones, and a wrong one plays a generic reaction. The camera is
 used only on that page and nothing is uploaded; hand tracking (MediaPipe) and its model are

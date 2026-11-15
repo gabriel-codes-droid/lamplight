@@ -3,14 +3,14 @@
 //  - assets/icons/*.png    : the animal avatar for each creature (what comes alive)
 //  - assets/hands/hand.jpg : the open hand on the title screen (a light outline on black,
 //                            turned into a transparent outline when it loads)
-// Custom shapes added by the player borrow one of the animal icons, or show a letter.
+// Custom shapes added by the player borrow one of the animal icons, an emoji from the kit, or the dotted hand the player recorded.
 const loaded = {};                       // key -> HTMLImageElement or canvas, once ready
 const listeners = [];
 const url = (path) => new URL(path, import.meta.url).href;
 
 export const ANIMALS = ['bird', 'dog', 'rabbit', 'sheep'];
 export const GESTURES = ['bird', 'dog', 'rabbit'];
-export const animalURL = (name) => url('./assets/icons/' + name + '.png');
+export const animalURL = (name) => ANIMALS.includes(name) ? url('./assets/icons/' + name + '.png') : url('./assets/emoji/' + name + '.png');
 export const gestureURL = (name) => url('./assets/gestures/' + name + '.png');
 
 function turnToOutline(im) {             // dark background and fill drop out, the light outline stays
@@ -46,8 +46,12 @@ load('hand', url('./assets/hands/hand.jpg'), turnToOutline);
 export function onIcons(f) { listeners.push(f); for (const k in loaded) f(k); }
 
 // custom shapes: name -> one of ANIMALS to borrow (or null for a letter badge)
-const borrowed = {};
-export function registerCreature(name, animal) { borrowed[name] = animal || null; }
+const borrowed = {}, handDots = {};
+// icon: one of ANIMALS, an emoji id from emoji.js, or null to show the dotted hand the player recorded (dots)
+export function registerCreature(name, icon, dots) {
+  borrowed[name] = icon || null; handDots[name] = dots || null;
+  if (icon && !loaded['animal:' + icon]) load('animal:' + icon, animalURL(icon));
+}
 const animalKey = (name) => 'animal:' + (ANIMALS.includes(name) ? name : borrowed[name]);
 
 function fit(c, im, cx, cy, size, flip, alpha) {
@@ -65,7 +69,14 @@ function fit(c, im, cx, cy, size, flip, alpha) {
 export function drawAnimal(c, name, cx, cy, size, flip = false, label = '') {
   const im = loaded[animalKey(name)];
   if (im) { fit(c, im, cx, cy, size, flip, 1); return; }
-  // no picture (a custom shape without an icon, or not loaded yet): a round badge with a letter
+  // no picture: the dotted hand the player recorded for it, on a round glass badge
+  if (!borrowed[name] && handDots[name] && !ANIMALS.includes(name)) {
+    c.save(); c.fillStyle = 'rgba(30,30,30,0.72)'; c.beginPath(); c.arc(cx, cy, size * 0.5, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.2)'; c.lineWidth = 2; c.stroke(); c.restore();
+    drawDots(c, handDots[name], cx, cy, size * 0.72);
+    return;
+  }
+  // not loaded yet, or no hand recorded: a round badge with a letter
   c.save();
   c.fillStyle = '#414141'; c.beginPath(); c.arc(cx, cy, size * 0.42, 0, 7); c.fill();
   c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = '700 ' + Math.round(size * 0.42) + 'px Inter, system-ui, sans-serif';
@@ -106,10 +117,11 @@ export function drawDots(c, dots, cx, cy, size) {
   let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
   for (const h of dots) for (const p of h) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
   const k = size / Math.max(x1 - x0, y1 - y0, 0.01), ox = cx - (x0 + x1) / 2 * k, oy = cy - (y0 + y1) / 2 * k;
-  c.save(); c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = 2.5; c.lineCap = 'round'; c.fillStyle = '#ffffff';
+  c.save(); const lw = Math.max(1, Math.min(2.5, size / 70)), dr = Math.max(1.6, Math.min(4, size / 45));
+  c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = lw; c.lineCap = 'round'; c.fillStyle = '#ffffff';
   for (const h of dots) {
     c.beginPath(); for (const [a, b] of BONES) { c.moveTo(h[a][0] * k + ox, h[a][1] * k + oy); c.lineTo(h[b][0] * k + ox, h[b][1] * k + oy); } c.stroke();
-    c.beginPath(); for (const p of h) { c.moveTo(p[0] * k + ox + 4, p[1] * k + oy); c.arc(p[0] * k + ox, p[1] * k + oy, 4, 0, 7); } c.fill();
+    c.beginPath(); for (const p of h) { c.moveTo(p[0] * k + ox + dr, p[1] * k + oy); c.arc(p[0] * k + ox, p[1] * k + oy, dr, 0, 7); } c.fill();
   }
   c.restore();
 }

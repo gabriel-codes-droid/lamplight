@@ -2,6 +2,7 @@
 // 2D context, so it knows nothing about WebXR. main.js feeds it the hand
 // shadow segments each frame and puts the canvas on the wall.
 import { drawDots as drawDots2, drawWolf, drawGirl, drawAnimal, drawGesture, drawHand, registerCreature, GESTURES, ANIMALS } from './icons.js';
+import { solves, traitVerb } from './traits.js';
 import { maskPath } from './outline.js';
 import { N, rasterize, iou, bestMatch, match, variantsOf } from './matcher.js';
 
@@ -185,7 +186,7 @@ const dogRun = flight([[0, 0, 0], [0.4, 540, 385], [1, 600, 385]]);
 const R = (caption, pts) => ({ caption, move: flight(pts) });   // a wrong creature's 3 second reaction
 const SCENES = [
   {
-    shape: 'bird', alive: 11,
+    shape: 'bird', alive: 11, needs: ['fly', 'swim'],
     prompt: 'Mira\'s key is across the river.',
     reactions: {
       dog: R('The dog leaps into the river, paddles in circles and swims back.', [[0, 0, 0], [0.25, 420, 400], [0.4, 500, 438], [0.6, 560, 440], [0.8, 450, 438], [1, 330, 395]]),
@@ -201,7 +202,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog', alive: 11,
+    shape: 'dog', alive: 11, needs: ['fierce', 'strong'],
     prompt: 'A wolf blocks the path.',
     reactions: {
       bird: R('The bird flaps at the wolf\'s ears. The wolf only yawns.', [[0, 0, 0], [0.3, 690, 320], [0.5, 720, 300], [0.7, 700, 320], [1, 960, -80]]),
@@ -220,7 +221,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'bird', alive: 14,
+    shape: 'bird', alive: 14, needs: ['fly', 'climb'],
     prompt: 'Night in the pines. A lantern hangs too high.',
     reactions: {
       dog: R('The dog barks and leaps. The lantern hangs far out of reach.', [[0, 0, 0], [0.3, 690, 392], [0.45, 690, 340], [0.6, 690, 392], [0.75, 690, 340], [1, 520, 395]]),
@@ -241,7 +242,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog', alive: 14,
+    shape: 'dog', alive: 14, needs: ['herd'],
     prompt: 'Sheep crowd the lane, and the pen stands open.',
     reactions: {
       bird: R('The bird circles above. The sheep do not look up.', [[0, 0, 0], [0.5, 500, 170], [1, 920, 110]]),
@@ -259,7 +260,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'rabbit', alive: 14,
+    shape: 'rabbit', alive: 14, needs: ['squeeze', 'dig'],
     prompt: 'The gate is latched from the far side.',
     reactions: {
       bird: R('The bird perches on the gate and cannot find the latch.', [[0, 0, 0], [0.4, 590, 290], [0.7, 590, 292], [1, 940, 90]]),
@@ -274,7 +275,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'rabbit', alive: 11,
+    shape: 'rabbit', alive: 11, needs: ['jump', 'dig'],
     prompt: 'A wall stands before home.',
     reactions: {
       bird: R('The bird pecks at the wall and gives up.', [[0, 0, 0], [0.35, 560, 250], [0.45, 552, 246], [0.55, 562, 254], [0.65, 552, 246], [1, 820, 90]]),
@@ -292,7 +293,7 @@ const SCENES = [
   },
   // ---- the last four scenes: each pair needs two creatures, one after the other ----
   {
-    shape: 'bird', alive: 12,
+    shape: 'bird', alive: 12, needs: ['fly', 'jump'],
     prompt: 'The cart is stuck in the mud. The rope is out of reach.',
     caption: 'The rope drops over the cart\'s hook.',
     creature: flight([[0, 0, 0], [0.35, 860, 380], [0.7, 610, 330], [1, 570, -120]]),
@@ -308,7 +309,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog', alive: 12,
+    shape: 'dog', alive: 12, needs: ['strong'],
     prompt: 'The rope is tied on. The cart will not budge.',
     caption: 'Heave! The cart rolls free.',
     creature: flight([[0, 0, 0], [0.25, 700, 388], [0.9, 960, 388], [1, 990, 388]]),
@@ -324,7 +325,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'bird', alive: 12,
+    shape: 'bird', alive: 12, needs: ['fly', 'climb'],
     prompt: 'The gate is chained shut. The key hangs high in the tree.',
     caption: 'The key drops into Mira\'s hands.',
     creature: flight([[0, 0, 0], [0.4, 898, 236], [0.85, 252, 330], [1, 330, -120]]),
@@ -341,7 +342,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'rabbit', alive: 12,
+    shape: 'rabbit', alive: 12, needs: ['dig'],
     prompt: 'The chain will not open. The gate stands on soft earth.',
     caption: 'Under the post, and the chain falls slack.',
     creature: flight([[0, 0, 0], [0.3, 470, 396], [0.5, 520, 426], [0.62, 600, 398], [0.75, 668, 342], [1, 720, 396]]),
@@ -371,9 +372,9 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
   const customMeta = {};
   const allNames = [...SHAPE_NAMES];
   const labelOf = (n) => (customMeta[n] && customMeta[n].label) || n;
-  const faces = (n) => (n in FACES ? FACES[n] : customMeta[n] && customMeta[n].icon in FACES ? FACES[customMeta[n].icon] : 1);
+  const faces = (n) => (n in FACES ? FACES[n] : customMeta[n] && customMeta[n].icon in FACES ? FACES[customMeta[n].icon] : 0);
   function addCustom(name, meta, mask) {
-    customMeta[name] = meta; registerCreature(name, meta.icon);
+    customMeta[name] = meta; registerCreature(name, meta.icon, meta.dots);
     if (!allNames.includes(name)) allNames.push(name);
     if (mask) { (shapes[name] || (shapes[name] = [])).push(mask); variantsOf(mask); }
   }
@@ -389,7 +390,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
   const bgGrad = c.createRadialGradient(W / 2, H * 0.45, 40, W / 2, H * 0.45, W * 0.62);
   bgGrad.addColorStop(0, 'rgb(246,220,163)'); bgGrad.addColorStop(0.6, '#d9a85e'); bgGrad.addColorStop(1, '#6b3d18');
   const s = { phase: 'title', hasRef: false, teachLine: '', savedLine: '', i: 0, t: 0, hold: 0, stuck: 0, cand: null, best: 0, lastX: null, facing: 1, reactShape: null, callAgain: false, titleHold: 0, live: false, hands: 0, supported: true, lost: 0, still: 0, cooldown: 0, teach: null,
-              ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [] };
+              ref: null, clock: 0, mask: null, score: 0, snap: null, segs: [], solver: null };
   const toTeach = teach.slice();
 
   function begin() {
@@ -419,11 +420,13 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     Object.assign(s, { phase: 'react', t: 0, hold: 0, cand: null, reactShape: shape, snap: makeSnap(), lastX: null });
     sfx.creature && sfx.creature(shape);
   }
-  function succeed() {
+  // A creature the player added solves the scene when it has an ability the problem needs.
+  const fits = (name) => !!(customMeta[name] && solves(customMeta[name].traits, SCENES[s.i].needs));
+  function succeed(who) {
     const snap = makeSnap();
-    Object.assign(s, { phase: 'alive', t: 0, snap, cand: null, lastX: null });
+    Object.assign(s, { phase: 'alive', t: 0, snap, cand: null, lastX: null, solver: who || SCENES[s.i].shape });
     sfx.chime && sfx.chime();
-    sfx.creature && sfx.creature(SCENES[s.i].shape);
+    sfx.creature && sfx.creature(s.solver);
     s.callAgain = false;
   }
   function saveTeach(mask, persist) {
@@ -458,7 +461,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     }
     if (s.phase === 'alive' && s.t > (SCENES[s.i].alive || ALIVE_TIME)) { s.i + 1 < SCENES.length ? startScene(s.i + 1) : Object.assign(s, { phase: 'end', t: 0 }); }
     if (s.phase === 'alive' && !s.callAgain && s.t > (SCENES[s.i].alive || ALIVE_TIME) * 0.55) { // the creature calls once more
-      s.callAgain = true; sfx.creature && sfx.creature(SCENES[s.i].shape);
+      s.callAgain = true; sfx.creature && sfx.creature(s.solver);
     }
     if (s.phase === 'end' && s.t > 8) startScene(0);
     if (s.clock < 0.06) return;          // match about 16 times a second
@@ -488,14 +491,14 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
         s.hold = Math.max(0, s.hold - el * 2);
         if (s.hold === 0) s.cand = null;
       }
-      if (s.hold >= MATCH_HOLD) { if (s.cand === want) succeed(); else react(s.cand); }
+      if (s.hold >= MATCH_HOLD) { if (s.cand === want || fits(s.cand)) succeed(s.cand); else react(s.cand); }
     }
   }
 
   // Desktop: bring a creature to life without hands (keys 1, 2, 3 in main.js).
   function tryShape(name) {
     if (s.phase !== 'wait' && s.phase !== 'intro') return;
-    if (name === SCENES[s.i].shape) succeed(); else react(name);
+    if (name === SCENES[s.i].shape || fits(name)) succeed(name); else react(name);
   }
 
   // Desktop preview / debugging: pass the current step without hands.
@@ -552,6 +555,11 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     if (c.roundRect) c.roundRect(x, y, w, h, r); else c.rect(x, y, w, h);
     c.fill();
     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 2; c.stroke();   // beveled edge
+  }
+  // What the narration says when a creature the player added solves the problem.
+  function solvedLine(name, scene) {
+    const t = (customMeta[name].traits || []).find((k) => scene.needs.includes(k));
+    return `The ${labelOf(name)} ${traitVerb(t)}. Problem solved.`;
   }
   // An animal icon at (x, y), turned the way it is moving.
   function creatureAt(name, x, y) {
@@ -679,7 +687,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
       let cr = null;
       if (alive) { cr = scene.creature(p, sx, sy); cr[1] += Math.sin(s.t * 9) * 5; }
       scene.draw(c, p, time, cr);
-      if (alive) text(scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
+      if (alive) text(s.solver && s.solver !== scene.shape ? solvedLine(s.solver, scene) : scene.caption, 46, 28, 0.85 * Math.min(ramp(s.t, 0, 0.8), ramp(dur - s.t, 0, 0.8)));
       if (reacting) {                       // the wrong creature, and what it does
         const re = (scene.reactions && scene.reactions[s.reactShape]) || genericReaction(s.reactShape);
         const rp = clamp01(s.t / REACT_TIME), rc = re.move(rp, sx, sy);
@@ -703,7 +711,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
           text('Make this gesture with your hands.', 80, 20, 0.6 * help);
         }
       } else {
-        creatureAt(scene.shape, cr[0], cr[1]);
+        creatureAt(s.solver || scene.shape, cr[0], cr[1]);
       }
     }
     if (s.lost > LOST_SHOW && (s.phase === 'wait' || s.phase === 'intro' || (s.phase === 'teach' && s.cooldown <= 0))) {

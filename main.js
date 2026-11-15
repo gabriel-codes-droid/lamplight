@@ -7,7 +7,8 @@ import { encode, decode } from './matcher.js';
 import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import * as SHAPES from './shapes.js';
 import { createAddShape } from './addshape.js';
-import { animalURL } from './icons.js';
+import { traitLabel } from './traits.js';
+import { animalURL, drawDots } from './icons.js';
 import { createAudio } from './audio.js';
 import { createShadow } from './shadow.js';
 import { createRecorder, createReplay } from './capture.js';
@@ -98,10 +99,12 @@ function renderCustom() {
   for (const el of tilesEl.querySelectorAll('.tile.custom')) el.remove();
   for (const [name, meta] of Object.entries(customMeta)) {
     const tile = document.createElement('div'); tile.className = 'tile custom';
-    const pic = meta.icon ? '<img src="' + animalURL(meta.icon) + '" alt="">' : '<span class="letter"></span>';
-    tile.innerHTML = '<div class="ico">' + pic + '</div><div><b></b><small>Your gesture</small></div><button class="remove" aria-label="Remove"></button>';
+    const pic = meta.icon ? '<img src="' + animalURL(meta.icon) + '" alt="">' : '<canvas width="80" height="80"></canvas>';
+    tile.innerHTML = '<div class="ico">' + pic + '</div><div><b></b><small></small></div><button class="remove" aria-label="Remove"></button>';
     tile.querySelector('b').textContent = meta.label;
-    const letter = tile.querySelector('.letter'); if (letter) letter.textContent = meta.label.charAt(0).toUpperCase();
+    tile.querySelector('small').textContent = (meta.traits && meta.traits.length ? meta.traits.map(traitLabel).join(', ') : 'No abilities ticked') + (meta.note ? ' • ' + meta.note : '');
+    const cv = tile.querySelector('canvas');
+    if (cv) { if (meta.dots) drawDots(cv.getContext('2d'), meta.dots, 40, 40, 62); else { const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.font = '700 36px sans-serif'; g.textAlign = 'center'; g.fillText(meta.label.charAt(0).toUpperCase(), 40, 52); } }
     tile.querySelector('.remove').textContent = '\u00d7';
     tile.querySelector('.remove').addEventListener('click', () => {
       delete customMeta[name]; delete hexShapes[name]; delete stored[name]; delete customStored[name]; theatre.removeCustom(name);
@@ -114,8 +117,8 @@ function renderCustom() {
 const addDialog = createAddShape(document.getElementById('add'), {
   existing: () => theatre.shapeNames().filter((n) => shapes[n] && shapes[n].length)
     .map((n) => ({ name: n, label: (customMeta[n] && customMeta[n].label) || n, templates: shapes[n] })),
-  save({ name, label, icon, masks, dots }) {
-    customMeta[name] = { label, icon, dots }; customStored[name] = customMeta[name];
+  save({ name, label, icon, masks, dots, traits = [], note = '' }) {
+    customMeta[name] = { label, icon, dots, traits, note }; customStored[name] = customMeta[name];
     try { localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
     masks.forEach((m, i) => { saveHex(name, m); theatre.addCustom(name, customMeta[name], m); });
     renderCustom();
