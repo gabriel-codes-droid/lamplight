@@ -202,7 +202,7 @@ const SCENES = [
     },
   },
   {
-    shape: 'dog', alive: 11, needs: ['fierce', 'strong'],
+    shape: 'dog', alive: 11, needs: ['fierce', 'strong', 'attract'],
     prompt: 'A wolf blocks the path.',
     reactions: {
       bird: R('The bird flaps at the wolf\'s ears. The wolf only yawns.', [[0, 0, 0], [0.3, 690, 320], [0.5, 720, 300], [0.7, 700, 320], [1, 960, -80]]),
@@ -396,7 +396,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
   function begin() {
     const missing = toTeach.shift() || SHAPE_NAMES.find((n) => !has(n));
     if (missing) Object.assign(s, { phase: 'teach', teach: missing, t: 0, still: 0, hasRef: false, cooldown: 0,
-      teachLine: `Teach the theatre a ${missing}.`, savedLine: `Saved: ${missing}` });
+      teachLine: `Teach the theatre a ${labelOf(missing).toLowerCase()}.`, savedLine: `Saved: ${labelOf(missing)}` });
     else startScene(Math.min(start, SCENES.length - 1));
   }
   function startScene(i) { Object.assign(s, { phase: 'intro', i, t: 0, hold: 0, stuck: 0, snap: null }); }
@@ -634,6 +634,7 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     return true;
   }
 
+  let hudFn = null;
   function paint(time) {
     // lamp-lit paper wall, with a slow flicker
     c.clearRect(0, 0, W, H);
@@ -721,6 +722,10 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     }
     c.globalAlpha = 0.93; drawSegs(s.segs); c.globalAlpha = 1; // the player's live shadow
     drawDots(s.segs);
+    if (hudFn) {                                // ?debug: the matcher readout, on the wall so it shows in the headset and in screenshots
+      c.fillStyle = 'rgba(0,0,0,0.55)'; c.fillRect(24, H - 54, 560, 34);
+      c.font = '600 15px monospace'; c.textAlign = 'left'; c.fillStyle = '#9fe870'; c.fillText(hudFn(), 34, H - 32);
+    }
     c.restore();
     c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 3;       // beveled rim
     c.beginPath(); if (c.roundRect) c.roundRect(1.5, 1.5, W - 3, H - 3, WALL_R - 1.5); else c.rect(1.5, 1.5, W - 3, H - 3); c.stroke();
@@ -731,5 +736,5 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
     if (s.phase === 'teach') return s.teach;
     return s.phase === 'intro' || s.phase === 'wait' || s.phase === 'alive' ? SCENES[s.i].shape : null;
   }
-  return { update, draw, skip, tryShape, addCustom, removeCustom, shapeNames: () => allNames, target, state: s, threshold: currentThreshold };
+  return { setHud(f) { hudFn = f; }, update, draw, skip, tryShape, addCustom, removeCustom, shapeNames: () => allNames, target, state: s, threshold: currentThreshold };
 }

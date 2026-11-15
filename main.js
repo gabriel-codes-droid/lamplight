@@ -7,8 +7,9 @@ import { encode, decode } from './matcher.js';
 import { createTheatre, SHAPE_NAMES, W, H } from './theatre.js';
 import * as SHAPES from './shapes.js';
 import { createAddShape } from './addshape.js';
-import { traitLabel } from './traits.js';
-import { animalURL, drawDots } from './icons.js';
+import { traitLabel, TRAIT_KEYS, ABILITY_ALIASES } from './traits.js';
+import { EMOJI } from './emoji.js';
+import { ANIMALS, animalURL, drawDots } from './icons.js';
 import { createAudio } from './audio.js';
 import { createShadow } from './shadow.js';
 import { createRecorder, createReplay } from './capture.js';
@@ -46,13 +47,26 @@ const names = (key) => {                       // which shapes a ?key or ?key=a,
   const list = params.get(key).split(',').map((n) => n.trim()).filter((n) => all.includes(n));
   return list.length ? list : all;
 };
+// ?new=kangaroo&ability=jump&icon=e718  teach a new creature with the emulator or a headset (no camera needed).
+// The ability is one of fly, swim, climb, dig, jump, squeeze, strong, scare, attract, herd. icon is a built-in animal
+// (bird, dog, rabbit, sheep) or a kit picture such as e718 (or just 718); leave it out for a letter badge.
+const newName = (params.get('new') || '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+if (newName) {
+  const ab = (params.get('ability') || '').trim().toLowerCase(), key = ABILITY_ALIASES[ab] || ab;
+  const ic = (params.get('icon') || '').trim().toLowerCase(), icon = [...ANIMALS, ...EMOJI].find((n) => n === ic || n === 'e' + ic) || null;
+  const label = newName.charAt(0).toUpperCase() + newName.slice(1).replace(/-/g, ' ');
+  customMeta[newName] = { label, icon, traits: TRAIT_KEYS.includes(key) ? [key] : [], note: '' };
+  customStored[newName] = customMeta[newName];
+  try { localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
+}
 const hexShapes = {};
 for (const name of new Set([...Object.keys(DEFAULT_SHAPES), ...Object.keys(stored)]))
   hexShapes[name] = asList(name in stored ? stored[name] : DEFAULT_SHAPES[name]);
 for (const name of names('record')) hexShapes[name] = [];
+if (newName) hexShapes[newName] = [];
 const shapes = {};
 for (const [name, list] of Object.entries(hexShapes)) shapes[name] = list.map(decode);
-const teach = [...new Set([...names('record'), ...names('add')])];
+const teach = [...new Set([...names('record'), ...names('add'), ...(newName ? [newName] : [])])];
 
 // ---- the page: gesture icons, and a button that shrinks the panel so the wall stays visible ----
 const panel = document.getElementById('panel'), toggle = document.getElementById('toggle');
@@ -64,7 +78,7 @@ function setMinimised(min) {
 toggle.addEventListener('click', () => setMinimised(!panel.classList.contains('min')));
 if (debug) setMinimised(true);   // replaying or debugging: keep the wall in view
 
-if (params.has('record') || params.has('add') || params.has('dev') || debug) document.getElementById('devbox').hidden = false;   // the export box is a developer tool: hidden for players
+if (params.has('record') || params.has('add') || params.has('new') || params.has('dev') || debug) document.getElementById('devbox').hidden = false;   // the export box is a developer tool: hidden for players
 const exportBox = document.getElementById('export');
 function showExport() {
   if (exportBox) exportBox.value = `export const DEFAULT_SHAPES = ${JSON.stringify(hexShapes, null, 2)};\nexport const DEFAULT_CUSTOM = ${JSON.stringify(customMeta, null, 2)};`;
@@ -221,6 +235,7 @@ addEventListener('keydown', (e) => {
 });
 
 const clock = new THREE.Clock();
+if (debug) theatre.setHud(() => { const st = theatre.state; return `${st.phase} want:${theatre.target() || '-'} score:${st.score.toFixed(2)} best:${st.best.toFixed(2)} cand:${st.cand || '-'} hold:${st.hold.toFixed(1)} hands:${st.hands}`; });
 let hudAt = 0, hudFrames = 0;
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.1);

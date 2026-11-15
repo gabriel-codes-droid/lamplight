@@ -10,8 +10,11 @@ export const TRAITS = [
   { key: 'squeeze', verb: 'slips through the gap', label: 'Squeezes through gaps', note: 'small, slim body' },
   { key: 'strong', verb: 'puts all its strength into it', label: 'Very strong', note: 'can pull or push heavy things' },
   { key: 'fierce', verb: 'stands its ground', label: 'Fierce', note: 'teeth, size, loud roar' },
+  { key: 'attract', verb: 'puts on a show and draws every eye', label: 'Attracts attention', note: 'bright feathers, loud call' },
   { key: 'herd', verb: 'gathers them up', label: 'Herds others', note: 'keeps animals together' },
 ];
+// ?ability= accepts these words too
+export const ABILITY_ALIASES = { scare: 'fierce', hop: 'jump', leap: 'jump', fly: 'fly', dig: 'dig', jump: 'jump', attract: 'attract' };
 export const TRAIT_KEYS = TRAITS.map((t) => t.key);
 export const traitVerb = (k) => (TRAITS.find((t) => t.key === k) || { verb: 'helps' }).verb;
 export const traitLabel = (k) => (TRAITS.find((t) => t.key === k) || { label: k }).label.toLowerCase();
