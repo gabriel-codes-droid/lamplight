@@ -11,6 +11,7 @@ import { traitLabel, TRAIT_KEYS, ABILITY_ALIASES } from './traits.js';
 import { EMOJI } from './emoji.js';
 import { ANIMALS, animalURL, drawDots } from './icons.js';
 import { createAudio } from './audio.js';
+import { createCamHands } from './camhands.js';
 import { createShadow } from './shadow.js';
 import { createRecorder, createReplay } from './capture.js';
 
@@ -24,6 +25,8 @@ const threshold = parseFloat(params.get('th')) || 0.55; // ?th=0.5 makes matchin
 const startScene = Math.max(0, (parseInt(params.get('start'), 10) || 1) - 1); // ?start=4 begins at scene 4
 const replayFile = params.get('replay');                // ?replay=captures/x.json plays a capture back
 const recorder = params.has('capture') ? createRecorder() : null; // ?capture records the hands
+// DEV ONLY (remove before release): ?remote reloads the page when /ctl.txt on the dev server changes
+if (params.has('remote')) { let last = null; setInterval(async () => { try { const t = (await (await fetch('/ctl.txt', { cache: 'no-store' })).text()).trim(); if (last === null) { last = t; return; } if (t !== last) { last = t; if (t) location.search = t; } } catch (e) { /* no dev server */ } }, 1000); }
 const debug = params.has('debug') || !!replayFile || !!recorder;  // on-page readout of the matcher
 
 // ---- shapes: built-in ones, overridden by ones taught on this device ----
@@ -234,6 +237,8 @@ addEventListener('keydown', (e) => {
   if (n !== undefined) theatre.tryShape(SHAPE_NAMES[n]);
 });
 
+// ?cam: the webcam reads your hands and drives the wall, no headset needed (?cam&nopreview hides the small camera view)
+const cam = params.has('cam') ? createCamHands({ W, H, preview: !params.has('nopreview') }) : null;
 const clock = new THREE.Clock();
 if (debug) theatre.setHud(() => { const st = theatre.state; return `${st.phase} want:${theatre.target() || '-'} score:${st.score.toFixed(2)} best:${st.best.toFixed(2)} cand:${st.cand || '-'} hold:${st.hold.toFixed(1)} hands:${st.hands}`; });
 let hudAt = 0, hudFrames = 0;
@@ -246,6 +251,9 @@ renderer.setAnimationLoop(() => {
     input.hands = shadow.collect(replay.hands, segs);
   } else if (replayFile && !replayFailed) {       // still loading it
     input.live = true; input.supported = true; input.hands = 0; segs.length = 0;
+  } else if (cam && !renderer.xr.isPresenting) {  // the webcam is driving the hands
+    input.live = cam.state.ready; input.supported = true;
+    input.hands = cam.update(segs);
   } else if (renderer.xr.isPresenting) {
     input.live = true;
     input.hands = shadow.collect(hands, segs);

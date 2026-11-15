@@ -36,7 +36,7 @@ export function landmarksToSegs(hands, vw, vh) {
       segs.push({ ax: P[a][0], ay: P[a][1], bx: P[b][0], by: P[b][1], r });
     }
     const dx = P[0][0] - P[9][0], dy = P[0][1] - P[9][1], len = Math.hypot(dx, dy) || 1;   // forearm stub
-    segs.push({ ax: P[0][0], ay: P[0][1], bx: P[0][0] + dx / len * span * 2.4, by: P[0][1] + dy / len * span * 2.4, r: span * 0.3 });
+    segs.push({ ax: P[0][0], ay: P[0][1], bx: P[0][0] + dx / len * span * 2.4, by: P[0][1] + dy / len * span * 2.4, r: span * 0.3, joint: false });
   }
   return segs;
 }
@@ -53,13 +53,25 @@ export function findSimilar(mask, existing) {
 
 export const slugify = (label) => label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
 
+// MediaPipe's hand model, loaded once and shared by the Add-a-shape dialog and the ?cam mode.
+let landmarker = null;
+export async function loadLandmarker(numHands = 6) {
+  if (landmarker) return landmarker;
+  const { FilesetResolver, HandLandmarker } = await import(MP_BASE + '/vision_bundle.mjs');
+  const vision = await FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
+  landmarker = await HandLandmarker.createFromOptions(vision, {
+    baseOptions: { modelAssetPath: MP_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands,
+  });
+  return landmarker;
+}
+
 // root: the modal element; api: { existing(): [{name,label,templates}], save({name,label,icon,mask}) }
 export function createAddShape(root, api) {
   const $ = (sel) => root.querySelector(sel);
   const steps = { form: $('[data-step="form"]'), camera: $('[data-step="camera"]') };
   const nameInput = $('#add-name'), status = $('#add-status'), video = $('#add-video'), overlay = $('#add-overlay'), bar = $('#add-bar');
   const iconRow = $('#add-icons'), formMsg = $('#add-form-msg');
-  let samples = [], dots = null, stream = null, landmarker = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
+  let samples = [], dots = null, stream = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
   const buf = new Uint8Array(N * N), ref = new Uint8Array(N * N);
 
   const traitRow = $('#add-traits'), noteInput = $('#add-note');
@@ -83,15 +95,7 @@ export function createAddShape(root, api) {
     video.srcObject = null; root.hidden = true;
   }
 
-  async function ensureLandmarker() {
-    if (landmarker) return landmarker;
-    const { FilesetResolver, HandLandmarker } = await import(MP_BASE + '/vision_bundle.mjs');
-    const vision = await FilesetResolver.forVisionTasks(MP_BASE + '/wasm');
-    landmarker = await HandLandmarker.createFromOptions(vision, {
-      baseOptions: { modelAssetPath: MP_MODEL, delegate: 'GPU' }, runningMode: 'VIDEO', numHands: 6,
-    });
-    return landmarker;
-  }
+  const ensureLandmarker = loadLandmarker;
 
   async function next() {                      // form -> camera
     label = nameInput.value.trim();
