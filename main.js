@@ -85,6 +85,16 @@ function showExport() {
   if (exportBox) exportBox.value = `export const DEFAULT_SHAPES = ${JSON.stringify(hexShapes, null, 2)};\nexport const DEFAULT_CUSTOM = ${JSON.stringify(customMeta, null, 2)};`;
 }
 showExport();
+// Download shapes.js: every template of every shape (built-in and added), ready to drop into the repo
+document.getElementById('save-shapes')?.addEventListener('click', () => {
+  const head = '// Hand shapes the game ships with, recorded with ?record (every template of every shape).
+// Creatures added with "Add a shape" are in DEFAULT_CUSTOM; their gestures are in DEFAULT_SHAPES under the same name.
+';
+  const blob = new Blob([head + exportBox.value + '
+'], { type: 'text/javascript' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'shapes.js';
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
 document.getElementById('copy')?.addEventListener('click', () => {
   exportBox.select(); navigator.clipboard?.writeText(exportBox.value).catch(() => {});
 });
