@@ -72,6 +72,7 @@ export function createAddShape(root, api) {
   const steps = { form: $('[data-step="form"]'), camera: $('[data-step="camera"]') };
   const nameInput = $('#add-name'), status = $('#add-status'), video = $('#add-video'), overlay = $('#add-overlay'), bar = $('#add-bar');
   const iconRow = $('#add-icons'), formMsg = $('#add-form-msg');
+  let saved = false;
   let samples = [], dots = null, stream = null, raf = 0, icon = null, label = '', name = '', refMask = null, still = 0, lastT = 0, busy = false;
   const buf = new Uint8Array(N * N), ref = new Uint8Array(N * N);
 
@@ -89,7 +90,7 @@ export function createAddShape(root, api) {
   const show = (step) => { for (const k in steps) steps[k].hidden = k !== step; };
   const say = (msg, kind = '') => { status.textContent = msg; status.dataset.kind = kind; };
 
-  function open() { root.hidden = false; show('form'); formMsg.textContent = ''; nameInput.value = ''; noteInput.value = ''; for (const b of traitRow.querySelectorAll('input')) b.checked = false; nameInput.focus(); }
+  function open() { saved = false; root.hidden = false; show('form'); formMsg.textContent = ''; nameInput.value = ''; noteInput.value = ''; for (const b of traitRow.querySelectorAll('input')) b.checked = false; nameInput.focus(); }
   function close() {
     cancelAnimationFrame(raf); raf = 0;
     if (stream) { for (const t of stream.getTracks()) t.stop(); stream = null; }
@@ -168,6 +169,7 @@ export function createAddShape(root, api) {
       say('Got ' + samples.length + ' of ' + SAMPLES + '. Lower your hand, then make the same gesture again, a little differently.', 'ok');
       still = 0; refMask = null; bar.value = 0; setTimeout(() => { busy = false; }, 2000); return;
     }
+    saved = true;
     api.save({ name, label, icon, masks: samples, dots, traits, note });
     say('Saved "' + label + '". It is now part of the game.', 'ok');
     cancelAnimationFrame(raf); raf = 0;
@@ -176,7 +178,12 @@ export function createAddShape(root, api) {
 
   $('#add-next').addEventListener('click', next);
   nameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); next(); } });
-  for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', close);
-  root.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  // Cancel, the x and Escape ask first when there is something to lose (a name typed, or the camera already open)
+  function askClose() {
+    const started = !steps.camera.hidden || nameInput.value.trim() || noteInput.value.trim() || traitRow.querySelector('input:checked');
+    if (saved || !started || window.confirm('Are you sure you want to cancel? This shape will not be saved.')) close();
+  }
+  for (const b of root.querySelectorAll('[data-close]')) b.addEventListener('click', askClose);
+  root.addEventListener('keydown', (e) => { if (e.key === 'Escape') askClose(); });
   return { open, close };
 }
