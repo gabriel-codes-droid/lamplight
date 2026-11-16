@@ -653,7 +653,8 @@ export function createTheatre({ ctx, shapes, custom = {}, teach = [], start = 0,
         textOn('This session has no hand tracking.', 280, 28, '#f7818c', 700);
         textOn('Turn on Hand Tracking in your headset settings, then enter VR again.', 326, 22, 'rgba(255,255,255,0.7)');
       } else if (!s.live) {
-        textOn('No headset? Press Space to begin.', 300, 22, 'rgba(255,255,255,0.7)');
+        textOn('No headset? Allow your webcam, then hold up both hands.', 292, 22, 'rgba(255,255,255,0.7)');
+        textOn('(No camera? Press Space to begin.)', 326, 18, 'rgba(255,255,255,0.5)');
       } else {
         textOn(s.hands >= 2 ? 'Hold still...' : s.hands === 1 ? 'Show your other hand too.' : 'Waiting for your hands...', 290, 24, 'rgba(255,255,255,0.7)');
         for (let h = 0; h < 2; h++) {   // one hand icon per hand seen, lit blue when tracked

@@ -7,6 +7,7 @@ import { rasterize, bestMatch, iou, N } from './matcher.js';
 import { ANIMALS, animalURL } from './icons.js';
 import { TRAITS } from './traits.js';
 import { EMOJI } from './emoji.js';
+import { openCamera } from './camera.js';
 
 const MP_VERSION = '0.10.14';
 const MP_BASE = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@' + MP_VERSION;
@@ -110,7 +111,7 @@ export function createAddShape(root, api) {
     show('camera'); say('Starting the camera...');
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('this browser cannot open a camera here (the page must be on https)');
-      stream = await within(navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false }), 20000, 'The camera did not start. Is another app using it?');
+      stream = (await within(openCamera(), 20000, 'The camera did not start. Is another app using it?')).stream;
       video.srcObject = stream; await within(video.play(), 10000, 'The camera did not start.');
       say('Loading hand tracking (about 8 MB, first time only)...');
       await within(ensureLandmarker(), 60000, 'Hand tracking did not load. Check your connection and try again.');

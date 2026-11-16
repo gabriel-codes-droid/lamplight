@@ -1,6 +1,7 @@
 // ?cam: your own hands, read by the webcam, drive the wall shadow, so the game can be played and
 // recorded on a laptop without a headset. Frames are processed in the browser and never uploaded.
 import { loadLandmarker, landmarksToSegs } from './addshape.js';
+import { openCamera } from './camera.js';
 
 export function createCamHands({ W, H, preview = true }) {
   const video = document.createElement('video');
@@ -17,11 +18,12 @@ export function createCamHands({ W, H, preview = true }) {
   (async () => {
     try {
       note.textContent = 'Starting the camera...';
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: 'user' }, audio: false });
+      const { stream, label } = await openCamera();
       video.srcObject = stream; await video.play();
+      note.textContent = 'Camera: ' + label;
       note.textContent = 'Loading hand tracking (about 8 MB, first time only)...';
       lm = await loadLandmarker();
-      state.ready = true; note.textContent = 'Show both hands to the camera.';
+      state.ready = true; note.textContent = 'Show both hands to the camera. Using: ' + label;
       setTimeout(() => { note.style.display = 'none'; }, 6000);
     } catch (e) {
       state.error = e && e.name === 'NotAllowedError' ? 'Camera access was blocked. Allow it and reload.' : 'Camera hands failed: ' + (e && e.message ? e.message : e);

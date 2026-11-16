@@ -77,7 +77,7 @@ function setMinimised(min) {
   toggle.setAttribute('aria-label', min ? 'Open panel' : 'Minimise panel');
 }
 toggle.addEventListener('click', () => setMinimised(!panel.classList.contains('min')));
-if (debug) setMinimised(true);   // replaying or debugging: keep the wall in view
+if (debug || params.has('cam')) setMinimised(true);   // replaying or debugging: keep the wall in view
 
 if (params.has('record') || params.has('add') || params.has('new') || params.has('dev') || debug) document.getElementById('devbox').hidden = false;   // the export box is a developer tool: hidden for players
 const exportBox = document.getElementById('export');
@@ -243,8 +243,16 @@ addEventListener('keydown', (e) => {
   if (n !== undefined) theatre.tryShape(SHAPE_NAMES[n]);
 });
 
-// ?cam: the webcam reads your hands and drives the wall, no headset needed (?cam&nopreview hides the small camera view)
-const cam = params.has('cam') ? createCamHands({ W, H, preview: !params.has('nopreview') }) : null;
+// the webcam reads your hands and drives the wall when there is no headset (?nopreview hides the small camera view)
+// On a desktop (no headset) the camera starts by itself. ?nocam turns that off, ?cam forces it on.
+let cam = null;
+const startCam = () => { setMinimised(true); if (!cam) cam = createCamHands({ W, H, preview: !params.has('nopreview') }); };
+if (params.has('cam')) startCam();
+else if (!params.has('nocam')) {
+  const xr = navigator.xr;
+  if (!xr || !xr.isSessionSupported) startCam();
+  else xr.isSessionSupported('immersive-vr').then((ok) => { if (!ok) startCam(); }, () => startCam());
+}
 const clock = new THREE.Clock();
 if (debug) theatre.setHud(() => { const st = theatre.state; return `${st.phase} want:${theatre.target() || '-'} score:${st.score.toFixed(2)} best:${st.best.toFixed(2)} cand:${st.cand || '-'} hold:${st.hold.toFixed(1)} hands:${st.hands}`; });
 let hudAt = 0, hudFrames = 0;

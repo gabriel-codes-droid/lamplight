@@ -27,8 +27,9 @@ There are none. Sit down, put the controllers away and use your hands.
   seconds after that.
 - **Hands out of view:** the game pauses its timers and asks you to bring them
   back.
-- **No headset (desktop preview):** press Space to pass a step, or **1**, **2**, **3** to
-  bring a bird, dog or rabbit to life (a wrong one plays its reaction).
+- **No headset (desktop):** the page asks for your webcam and reads your hands (see
+  *Play with your webcam*). Without a camera, Space passes a step, and **1**, **2**, **3** bring
+  a bird, dog or rabbit to life (a wrong one plays its reaction).
 
 Hand tracking must be on in the Quest settings. If the session has none, the
 wall says so.
@@ -89,7 +90,7 @@ gestures must be to count as the same.
 
 ## Play with your webcam (no headset)
 
-Open the page with `?cam`. Your webcam reads your hands (MediaPipe, in the browser; nothing is
+On a desktop the page does this by itself (`?cam` forces it, `?nocam` turns it off). Your webcam reads your hands (MediaPipe, in the browser; nothing is
 uploaded) and they drive the wall shadow, shown as a dotted skeleton. Use `?cam&record` to teach
 the three shapes with your own hands, `?cam&nopreview` to hide the small camera picture, and
 `&debug` to put the matcher readout on the wall. Shapes taught this way come from the webcam,
