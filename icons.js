@@ -1,0 +1,127 @@
+// Pictures used by the game, all from the Meta UI kit:
+//  - assets/gestures/*.png : the hand gesture for each creature (what the player makes)
+//  - assets/icons/*.png    : the animal avatar for each creature (what comes alive)
+//  - assets/hands/hand.jpg : the open hand on the title screen (a light outline on black,
+//                            turned into a transparent outline when it loads)
+// Custom shapes added by the player borrow one of the animal icons, an emoji from the kit, or the dotted hand the player recorded.
+const loaded = {};                       // key -> HTMLImageElement or canvas, once ready
+const listeners = [];
+const url = (path) => new URL(path, import.meta.url).href;
+
+export const ANIMALS = ['bird', 'dog', 'rabbit', 'sheep'];
+export const GESTURES = ['bird', 'dog', 'rabbit'];
+export const animalURL = (name) => ANIMALS.includes(name) ? url('./assets/icons/' + name + '.png') : url('./assets/emoji/' + name + '.png');
+export const gestureURL = (name) => url('./assets/gestures/' + name + '.png');
+
+function turnToOutline(im) {             // dark background and fill drop out, the light outline stays
+  const cv = document.createElement('canvas');
+  cv.width = im.naturalWidth; cv.height = im.naturalHeight;
+  const x = cv.getContext('2d');
+  x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, cv.width, cv.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = Math.max(p[i], p[i + 1], p[i + 2]);
+    p[i] = 216; p[i + 1] = 223; p[i + 2] = 232;
+    p[i + 3] = Math.max(0, Math.min(255, (lum - 28) * 3.2));
+  }
+  x.putImageData(d, 0, 0);
+  return cv;
+}
+function load(key, src, convert) {
+  if (typeof Image === 'undefined' || typeof document === 'undefined') return;
+  const im = new Image();
+  im.onload = () => {
+    try { loaded[key] = convert ? convert(im) : im; } catch (e) { return; }
+    for (const f of listeners) f(key);
+  };
+  im.src = src;
+}
+for (const n of ANIMALS) load('animal:' + n, animalURL(n));
+for (const n of GESTURES) load('gesture:' + n, gestureURL(n));
+load('wolf', url('./assets/icons/wolf.png'));
+load('girl', url('./assets/icons/girl.png'));
+load('hand', url('./assets/hands/hand.jpg'), turnToOutline);
+
+// Calls f(key) as each picture becomes ready, and right away for ones that already are.
+export function onIcons(f) { listeners.push(f); for (const k in loaded) f(k); }
+
+// custom shapes: name -> one of ANIMALS to borrow (or null for a letter badge)
+const borrowed = {}, handDots = {};
+// icon: one of ANIMALS, an emoji id from emoji.js, or null to show the dotted hand the player recorded (dots)
+export function registerCreature(name, icon, dots) {
+  borrowed[name] = icon || null; handDots[name] = dots || null;
+  if (icon && !loaded['animal:' + icon]) load('animal:' + icon, animalURL(icon));
+}
+const animalKey = (name) => 'animal:' + (ANIMALS.includes(name) ? name : borrowed[name]);
+
+function fit(c, im, cx, cy, size, flip, alpha) {
+  const w0 = im.naturalWidth || im.width, h0 = im.naturalHeight || im.height;
+  const k = size / Math.max(w0, h0), w = w0 * k, h = h0 * k;
+  c.save();
+  c.globalAlpha = alpha;
+  c.translate(cx, cy);
+  if (flip) c.scale(-1, 1);
+  c.drawImage(im, -w / 2, -h / 2, w, h);
+  c.restore();
+}
+
+// The animal that comes alive, centred on (cx, cy). flip turns it to face the other way.
+export function drawAnimal(c, name, cx, cy, size, flip = false, label = '') {
+  const im = loaded[animalKey(name)];
+  if (im) { fit(c, im, cx, cy, size, flip, 1); return; }
+  // no picture: the dotted hand the player recorded for it, on a round glass badge
+  if (!borrowed[name] && handDots[name] && !ANIMALS.includes(name)) {
+    c.save(); c.fillStyle = 'rgba(30,30,30,0.72)'; c.beginPath(); c.arc(cx, cy, size * 0.5, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,255,255,0.2)'; c.lineWidth = 2; c.stroke(); c.restore();
+    drawDots(c, handDots[name], cx, cy, size * 0.72);
+    return;
+  }
+  // not loaded yet, or no hand recorded: a round badge with a letter
+  c.save();
+  c.fillStyle = '#414141'; c.beginPath(); c.arc(cx, cy, size * 0.42, 0, 7); c.fill();
+  c.fillStyle = 'rgba(255,255,255,0.9)'; c.font = '700 ' + Math.round(size * 0.42) + 'px Inter, system-ui, sans-serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText((label || name || '?').charAt(0).toUpperCase(), cx, cy + size * 0.03);
+  c.restore();
+}
+// The hand gesture to make for a creature (built-in creatures only).
+export function drawGesture(c, name, cx, cy, size) {
+  const im = loaded['gesture:' + name];
+  if (im) fit(c, im, cx, cy, size, false, 1);
+}
+// The open hand on the title screen; alpha dims it until that hand is seen.
+export function drawHand(c, cx, cy, size, alpha = 1) {
+  const im = loaded.hand;
+  if (im) fit(c, im, cx, cy, size, false, alpha);
+}
+// Mira, the girl in the story (a bust from the MetaPeople avatars); her bottom edge sits on (cx, bottom).
+export function drawGirl(c, cx, bottom, size) {
+  const im = loaded.girl;
+  if (!im) return false;
+  fit(c, im, cx, bottom - size / 2, size, false, 1);
+  return true;
+}
+// The wolf in the story (an animal picture that is not a creature the player can make).
+export function drawWolf(c, cx, bottom, size, flip = false) {
+  const im = loaded.wolf;
+  if (!im) return false;
+  fit(c, im, cx, bottom - size / 2, size, flip, 1);
+  return true;
+}
+
+// A stored dotted hand (what the player recorded with "Add a shape"): lines between the joints and a dot on each.
+// dots: [[ [x, y] x21 ], ...] one list per hand, x and y in 0..1 camera space.
+const BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [9, 10], [10, 11], [11, 12], [13, 14], [14, 15], [15, 16],
+  [0, 17], [17, 18], [18, 19], [19, 20], [5, 9], [9, 13], [13, 17], [0, 9]];
+export function drawDots(c, dots, cx, cy, size) {
+  let x0 = 1, y0 = 1, x1 = 0, y1 = 0;
+  for (const h of dots) for (const p of h) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+  const k = size / Math.max(x1 - x0, y1 - y0, 0.01), ox = cx - (x0 + x1) / 2 * k, oy = cy - (y0 + y1) / 2 * k;
+  c.save(); const lw = Math.max(1, Math.min(2.5, size / 70)), dr = Math.max(1.6, Math.min(4, size / 45));
+  c.strokeStyle = 'rgba(255,255,255,0.7)'; c.lineWidth = lw; c.lineCap = 'round'; c.fillStyle = '#ffffff';
+  for (const h of dots) {
+    c.beginPath(); for (const [a, b] of BONES) { c.moveTo(h[a][0] * k + ox, h[a][1] * k + oy); c.lineTo(h[b][0] * k + ox, h[b][1] * k + oy); } c.stroke();
+    c.beginPath(); for (const p of h) { c.moveTo(p[0] * k + ox + dr, p[1] * k + oy); c.arc(p[0] * k + ox, p[1] * k + oy, dr, 0, 7); } c.fill();
+  }
+  c.restore();
+}

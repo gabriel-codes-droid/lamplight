@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lamplight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700&display=swap">
+<style>
+  /* Styled from the Meta RLDS 1.0 UI kit (dark theme). Token names in comments are the kit's. */
+  :root {
+    /* Semantic/Background/primary: Stop 1 -> Stop 2 */
+    --panel-1: #414141;
+    --panel-2: #272727;
+    /* Semantic/Text, Icon (on dark) */
+    --text: rgba(255, 255, 255, 0.90);          /* #ffffffe5 */
+    --text-2: rgba(255, 255, 255, 0.70);        /* #ffffffb2 */
+    --text-disabled: rgba(255, 255, 255, 0.45);
+    /* Plate/Divider, Header/Background, List Cells */
+    --divider: rgba(255, 255, 255, 0.20);       /* #ffffff33 */
+    --cell: rgba(255, 255, 255, 0.10);          /* #ffffff1a */
+    --cell-hover: rgba(255, 255, 255, 0.20);
+    --cell-pressed: rgba(255, 255, 255, 0.30);
+    /* Component/Search/Background/Default */
+    --field: rgba(0, 0, 0, 0.15);               /* #00000026 */
+    /* Core/Blue 60 (links, status) */
+    --blue: #148bfd;
+    --radius-xl: 28px;                          /* Corner/Extra-large */
+    --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0b0705; color: var(--text); overflow: hidden; font-family: var(--font); }
+
+  /* Panel: Materiality / Beveled + Shadow. Gradient fill, 1px beveled inner strokes, soft drop shadow, a little glass. */
+  #panel { position: fixed; z-index: 2; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 32px;
+    border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(65, 65, 65, 0.94), rgba(39, 39, 39, 0.94));
+    -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px);
+    box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.10), inset -1px -1px 1px rgba(0, 0, 0, 0.10),
+                0 16px 48px rgba(0, 0, 0, 0.45), 0 0 32px rgba(0, 0, 0, 0.25); }
+  #panel.min { top: 16px; left: 16px; transform: none; width: auto; max-width: 360px; padding: 12px 12px 12px 20px; }
+  #panel.min .body > :not(#debug):not(#dl) { display: none; }   /* keep the debug readout and capture button */
+  #panel.min pre#debug { margin: 8px 8px 4px 0; }
+  #panel.min h1 { font-size: 20px; line-height: 24px; letter-spacing: -0.5px; }
+
+  header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  /* Headline 1: Inter Bold 32/36, -1 tracking */
+  h1 { margin: 0; font-weight: 700; font-size: 32px; line-height: 36px; letter-spacing: -1px; color: var(--text); }
+  /* Component/Button/Tertiary, icon only: 44px, round, 1000 radius */
+  #toggle { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 1000px; background: transparent; color: var(--text);
+    font: 500 22px/1 var(--font); cursor: pointer; transition: background 0.12s; }
+  #toggle:hover { background: rgba(255, 255, 255, 0.10); }
+  #toggle:active { background: rgba(255, 255, 255, 0.20); }
+  /* Body 1: Inter Medium 14/20 */
+  .lead { margin: 8px 0 24px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-2); }
+  /* Headline 3: Inter Bold 16/20, -0.5 tracking */
+  h2 { margin: 0 0 12px; font-size: 16px; line-height: 20px; font-weight: 700; letter-spacing: -0.5px; color: var(--text); }
+  section { margin-bottom: 24px; }
+
+  /* List Cells: 12px padding, 12px gap, primary 14/20 + secondary 12/16 */
+  ul.cells { list-style: none; margin: 0; padding: 0; border-radius: 20px; overflow: hidden; background: var(--cell); }
+  ul.cells li { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 12px; font-size: 14px; line-height: 20px; font-weight: 500; }
+  ul.cells li + li { border-top: 1px solid rgba(255, 255, 255, 0.10); }
+  ul.cells .n { flex: none; width: 28px; height: 28px; border-radius: 1000px; background: rgba(255, 255, 255, 0.20);
+    display: grid; place-items: center; font-size: 12px; line-height: 16px; font-weight: 700; }
+  ul.cells small { display: block; font-size: 12px; line-height: 16px; color: var(--text-2); }
+
+  /* Tiles: 8px radius, primary + secondary label */
+  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border-radius: 20px; background: var(--cell); text-align: center; }
+  .tile .ico { width: 96px; height: 96px; display: grid; place-items: center; }
+  .tile .ico img { width: 100%; height: 100%; object-fit: contain; }
+  .tile .ico canvas { width: 100%; height: 100%; }
+  .tile .badge { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; padding: 3px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); }
+  .tile .badge img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .tile .letter { display: grid; place-items: center; width: 100%; height: 100%; font-size: 40px; font-weight: 700; color: var(--text); }
+  .tile .remove { position: absolute; top: 8px; left: 8px; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, 0.12);
+    color: var(--text); font: 500 16px/1 var(--font); cursor: pointer; }
+  .tile .remove:hover { background: rgba(255, 255, 255, 0.25); }
+  .section-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+  .section-row h2 { margin: 0; }
+
+  /* the "Add a shape" dialog */
+  .modal { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.55);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+  .modal .card { width: min(480px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 28px; border-radius: var(--radius-xl);
+    background: linear-gradient(180deg, rgba(65, 65, 65, 0.97), rgba(39, 39, 39, 0.97));
+    box-shadow: inset 1px 1px 1px rgba(255, 255, 255, 0.10), inset -1px -1px 1px rgba(0, 0, 0, 0.10), 0 16px 48px rgba(0, 0, 0, 0.45); }
+  .modal h2 { font-size: 24px; line-height: 28px; letter-spacing: -0.5px; margin: 0; }
+  .modal .field { display: block; margin: 0 0 20px; font-size: 14px; line-height: 20px; font-weight: 700; }
+  .modal input[type="text"] { display: block; width: 100%; margin-top: 8px; min-height: 48px; padding: 0 18px; border: 0; border-radius: 16px; background: var(--field); color: var(--text);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10); font: 500 16px/20px var(--font); }
+  .icons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .icons label { position: relative; cursor: pointer; }
+  .icons input { position: absolute; opacity: 0; inset: 0; }
+  .icons.pick { max-height: 232px; overflow-y: auto; padding: 4px; }
+  .icons .skel { font-size: 11px; line-height: 13px; font-weight: 700; text-align: center; }
+  .icons img, .icons span { display: grid; place-items: center; width: 56px; height: 56px; padding: 6px; border-radius: 16px; background: var(--cell); object-fit: contain;
+    font-size: 16px; font-weight: 700; border: 2px solid transparent; }
+  .icons input:checked + img, .icons input:checked + span { border-color: rgba(255, 255, 255, 0.9); background: var(--cell-hover); }
+  .icons input:focus-visible + img, .icons input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+  .sub { display: block; margin-top: 2px; font-size: 13px; line-height: 18px; font-weight: 500; color: var(--text-2); }
+  .traits { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .traits label { position: relative; cursor: pointer; }
+  .traits input { position: absolute; opacity: 0; inset: 0; }
+  .traits span { display: block; padding: 8px 14px; border-radius: 999px; background: var(--cell); border: 2px solid transparent; font-size: 14px; font-weight: 600; }
+  .traits small { display: block; font-size: 11px; font-weight: 500; color: var(--text-2); }
+  .traits input:checked + span { border-color: rgba(255, 255, 255, 0.9); background: var(--cell-hover); }
+  .traits input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+  .modal input[type="text"] { margin-top: 6px; }
+  .msg { min-height: 20px; margin: 0 0 16px; font-size: 14px; line-height: 20px; font-weight: 500; color: var(--text-2); }
+  .msg[data-kind="error"] { color: #f7818c; }
+  .msg[data-kind="ok"] { color: #59dd33; }
+  .cam { position: relative; margin: 20px 0 12px; border-radius: 20px; overflow: hidden; background: #000; }
+  .cam video, .cam canvas { display: block; width: 100%; transform: scaleX(-1); }
+  .cam canvas { position: absolute; inset: 0; height: 100%; }
+  progress { display: block; width: 100%; height: 8px; margin: 0 0 12px; border: 0; border-radius: 1000px; overflow: hidden; background: var(--cell); appearance: none; -webkit-appearance: none; }
+  progress::-webkit-progress-bar { background: var(--cell); }
+  progress::-webkit-progress-value { background: rgba(255, 255, 255, 0.9); border-radius: 1000px; }
+  progress::-moz-progress-bar { background: rgba(255, 255, 255, 0.9); }
+  .icon-btn { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text); font: 500 24px/1 var(--font); cursor: pointer; }
+  .icon-btn:hover { background: rgba(255, 255, 255, 0.10); }
+  button.primary { display: block; width: 100%; min-height: 48px; padding: 0 24px; border: 0; border-radius: 1000px; background: rgba(255, 255, 255, 0.90); color: #272727;
+    font: 700 14px/20px var(--font); cursor: pointer; }
+  button.primary:hover { background: rgba(255, 255, 255, 0.75); }
+  .tile b { display: block; font-size: 14px; line-height: 20px; font-weight: 700; }
+  .tile small { display: block; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); }
+
+  /* Primary button (dark theme): fill #ffffffe5, label #272727, 1000 radius, 48px hit target */
+  #enter { margin-top: 4px; }
+  #VRButton { position: static !important; display: block !important; width: 100% !important; left: auto !important; bottom: auto !important;
+    transform: none !important; min-height: 48px; padding: 0 24px !important; border: 0 !important; border-radius: 1000px !important;
+    background: rgba(255, 255, 255, 0.90) !important; color: #272727 !important; opacity: 1 !important; cursor: pointer;
+    font-family: var(--font) !important; font-weight: 700 !important; font-size: 14px !important; line-height: 20px !important; letter-spacing: 0 !important;
+    transition: background 0.12s; }
+  #VRButton:hover { background: rgba(255, 255, 255, 0.75) !important; }
+  #VRButton:active { background: rgba(255, 255, 255, 0.60) !important; }
+  #VRButton[style*="cursor: auto"], #VRButton:disabled { background: rgba(255, 255, 255, 0.20) !important; color: var(--text-disabled) !important; cursor: default; }
+  /* Secondary button: fill 10% / 20% / 30%, SM 32px */
+  button.chip { min-height: 32px; min-width: 80px; padding: 0 16px; border: 0; border-radius: 1000px; background: var(--cell); color: #f2f2f2;
+    font: 700 12px/16px var(--font); cursor: pointer; transition: background 0.12s; }
+  button.chip:hover { background: var(--cell-hover); }
+  button.chip:active { background: var(--cell-pressed); }
+  button:focus-visible, summary:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+  .hint { margin: 12px 0 0; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); text-align: center; }
+  details { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--divider); }
+  summary { cursor: pointer; font-size: 16px; line-height: 20px; font-weight: 700; letter-spacing: -0.5px; list-style: none; padding: 8px 0; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; color: var(--text-2); font-size: 20px; line-height: 20px; font-weight: 500; }
+  details[open] summary::after { content: "\2212"; }
+  details p { margin: 4px 0 12px; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--text-2); }
+  /* Search input: 8px radius, #00000026 fill, punched-in shadow */
+  textarea { width: 100%; height: 120px; padding: 14px 18px; border: 0; border-radius: 16px; resize: vertical; background: var(--field); color: var(--text);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10);
+    font: 500 12px/16px ui-monospace, Consolas, monospace; }
+  pre#debug { margin: 16px 0 0; padding: 12px 16px; border-radius: 16px; background: var(--field); color: var(--text-2);
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.10), 0 1px 1px rgba(255, 255, 255, 0.10);
+    font: 500 12px/16px ui-monospace, Consolas, monospace; white-space: pre-wrap; }
+  #dl { margin-top: 12px; }
+  [hidden] { display: none !important; }
+
+  @media (max-width: 520px) {
+    #panel { padding: 24px; }
+    .tiles { grid-template-columns: 1fr; }
+    .tile { flex-direction: row; justify-content: flex-start; text-align: left; padding: 8px 16px; }
+    .tile .ico { width: 56px; height: 56px; }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<main id="panel">
+  <header>
+    <h1>Lamplight</h1>
+    <button id="toggle" aria-label="Minimise panel" title="Minimise">&minus;</button>
+  </header>
+  <div class="body">
+    <p class="lead">A shadow-puppet story you play with your bare hands. Sit down and let the lamp do the rest.</p>
+
+    <section aria-labelledby="h-ready">
+      <h2 id="h-ready">Get ready</h2>
+      <ul class="cells">
+        <li><span class="n">1</span><span>Turn on Hand Tracking<small>In your Quest settings</small></span></li>
+        <li><span class="n">2</span><span>Put your controllers down<small>The game uses only your hands</small></span></li>
+        <li><span class="n">3</span><span>Enter VR and hold up both hands<small>The story starts when both are seen</small></span></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="h-shapes">
+      <div class="section-row"><h2 id="h-shapes">Shapes you will make</h2><button id="add-open" class="chip">Add a shape</button></div>
+      <div class="tiles" id="tiles">
+        <div class="tile"><div class="ico"><img src="assets/gestures/bird.png" alt=""></div><div class="badge"><img src="assets/icons/bird.png" alt=""></div><div><b>Bird</b><small>Two hands, wings out</small></div></div>
+        <div class="tile"><div class="ico"><img src="assets/gestures/dog.png" alt=""></div><div class="badge"><img src="assets/icons/dog.png" alt=""></div><div><b>Dog</b><small>Flat snout, ears up</small></div></div>
+        <div class="tile"><div class="ico"><img src="assets/gestures/rabbit.png" alt=""></div><div class="badge"><img src="assets/icons/rabbit.png" alt=""></div><div><b>Rabbit</b><small>Two fingers up</small></div></div>
+      </div>
+    </section>
+
+    <div id="enter"></div>
+    <p class="hint">No headset? Allow your webcam and make the gestures with your hands. (No camera: Space steps through the story.)</p>
+
+    <details id="devbox" hidden>
+      <summary>Shapes</summary>
+      <p>Shapes you teach are saved on this device. Copy this text into <code>shapes.js</code> to ship them to everyone.</p>
+      <textarea id="export" readonly aria-label="Exported shapes"></textarea>
+      <button id="copy" class="chip" style="margin-top:12px">Copy</button> <button id="save-shapes" class="chip" style="margin-top:12px">Download shapes.js</button>
+    </details>
+    <pre id="debug" hidden></pre>
+    <button id="dl" class="chip" hidden>Download capture</button>
+  </div>
+</main>
+<div id="add" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="add-title">
+  <div class="card">
+    <header><h2 id="add-title">Add a shape</h2><button class="icon-btn" data-close aria-label="Close">&times;</button></header>
+    <div data-step="form">
+      <p class="lead">Name a new creature, pick a picture (or keep the dotted hand), then make its gesture in front of your camera. The camera stays on this page; nothing is uploaded.</p>
+      <label class="field">Name<input type="text" id="add-name" maxlength="16" autocomplete="off" placeholder="Fox"></label>
+      <div class="field">Picture<small class="sub">Pick any animal from the kit. If none fits, keep &ldquo;Hand dots&rdquo; and the creature is shown as the dotted skeleton of your gesture.</small><div id="add-icons" class="icons pick"></div></div>
+      <div class="field">What is it good at?<small class="sub">Tick the natural abilities this animal has. Each story problem needs certain abilities, so these decide which problems it can solve.</small><div id="add-traits" class="traits"></div></div>
+      <label class="field">Its natural features <small class="sub">Optional, e.g. long legs, sharp claws, webbed feet</small><input type="text" id="add-note" maxlength="60" autocomplete="off" placeholder="Long legs, strong back"></label>
+      <p id="add-form-msg" class="msg" data-kind="error"></p>
+      <button id="add-next" class="primary">Open camera</button>
+    </div>
+    <div data-step="camera" hidden>
+      <div class="cam"><video id="add-video" playsinline muted></video><canvas id="add-overlay"></canvas></div>
+      <progress id="add-bar" max="1" value="0"></progress>
+      <p id="add-status" class="msg"></p>
+      <button class="chip" data-close>Cancel</button>
+    </div>
+  </div>
+</div>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
