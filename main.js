@@ -15,6 +15,7 @@ import { createCamHands } from './camhands.js';
 import { createShadow } from './shadow.js';
 import { createRecorder, createReplay } from './capture.js';
 import { createPauseExit } from './pauseExit.js';
+import { confirmCard } from './confirmCard.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
 const WALL_Z = -1.6, WALL_Y = 1.25, WALL_W = 3.2, WALL_H = 1.6;
@@ -130,8 +131,13 @@ function renderCustom() {
     const cv = tile.querySelector('canvas');
     if (cv) { if (meta.dots) drawDots(cv.getContext('2d'), meta.dots, 40, 40, 62); else { const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.font = '700 36px sans-serif'; g.textAlign = 'center'; g.fillText(meta.label.charAt(0).toUpperCase(), 40, 52); } }
     tile.querySelector('.remove').textContent = '\u00d7';
-    tile.querySelector('.remove').addEventListener('click', () => {
-      if (!window.confirm('Are you sure you want to delete "' + meta.label + '"? Its gesture is removed from this device and cannot be undone.')) return;
+    tile.querySelector('.remove').addEventListener('click', async () => {
+      const sure = await confirmCard({
+        title: 'Delete "' + meta.label + '"?',
+        message: 'Its gesture is removed from this device and cannot be undone.',
+        confirmLabel: 'Delete', cancelLabel: 'Cancel',
+      });
+      if (!sure) return;
       delete customMeta[name]; delete hexShapes[name]; delete stored[name]; delete customStored[name]; theatre.removeCustom(name);
       try { localStorage.setItem(STORE, JSON.stringify(stored)); localStorage.setItem(CUSTOM_STORE, JSON.stringify(customStored)); } catch (e) { /* storage unavailable */ }
       showExport(); renderCustom();
