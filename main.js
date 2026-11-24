@@ -14,6 +14,7 @@ import { createAudio } from './audio.js';
 import { createCamHands } from './camhands.js';
 import { createShadow } from './shadow.js';
 import { createRecorder, createReplay } from './capture.js';
+import { createPauseExit } from './pauseExit.js';
 
 // ---- layout, in metres. The player sits at the origin facing -Z. ----
 const WALL_Z = -1.6, WALL_Y = 1.25, WALL_W = 3.2, WALL_H = 1.6;
@@ -157,7 +158,7 @@ renderer.setPixelRatio(devicePixelRatio);
 renderer.setSize(innerWidth, innerHeight);
 renderer.xr.enabled = true;
 document.body.appendChild(renderer.domElement);
-(document.getElementById('enter') || document.body).appendChild(VRButton.createButton(renderer, { optionalFeatures: ['hand-tracking'] })); // styled in index.html
+(document.getElementById('enter') || document.body).appendChild(VRButton.createButton(renderer, { optionalFeatures: ['local-floor', 'hand-tracking'] })); // styled in index.html
 // What the theatre needs to know about the hands (see update() in theatre.js).
 const input = { live: false, hands: 0, supported: true };
 let xrStart = 0, seenHands = false;
@@ -220,6 +221,9 @@ const hands = [0, 1].map((i) => {
   return hand;
 });
 
+// ---- pause: a card with Resume / Exit VR (see pauseExit.js). Silences sound while paused. ----
+const pauseExit = createPauseExit({ renderer, scene, onPause: () => sfx.suspend(), onResume: () => sfx.resume() });
+
 // ---- shadow: hand joints -> segments on the wall (see shadow.js) ----
 const shadow = createShadow({ lamp: LAMP, wallZ: WALL_Z, wallY: WALL_Y, wallW: WALL_W, wallH: WALL_H, ppm: PPM });
 const segs = [];
@@ -239,6 +243,7 @@ downloadBtn?.addEventListener('click', () => recorder.download());
 renderer.xr.addEventListener('sessionend', () => { if (recorder) recorder.download(); });
 
 addEventListener('keydown', (e) => {
+  if (pauseExit.paused) return;
   if (e.code === 'Space') theatre.skip();
   const n = { Digit1: 0, Digit2: 1, Digit3: 2 }[e.code];            // desktop: 1, 2, 3 bring a bird, dog or rabbit to life
   if (n !== undefined) theatre.tryShape(SHAPE_NAMES[n]);
@@ -257,7 +262,7 @@ else if (!params.has('nocam')) {
 const clock = new THREE.Clock();
 if (debug) theatre.setHud(() => { const st = theatre.state; return `${st.phase} want:${theatre.target() || '-'} score:${st.score.toFixed(2)} best:${st.best.toFixed(2)} cand:${st.cand || '-'} hold:${st.hold.toFixed(1)} hands:${st.hands}`; });
 let hudAt = 0, hudFrames = 0;
-renderer.setAnimationLoop(() => {
+renderer.setAnimationLoop((_, frame) => {
   const dt = Math.min(clock.getDelta(), 0.1);
   const now = clock.elapsedTime;
   if (replay) {                                   // a capture is driving the hands
@@ -278,7 +283,8 @@ renderer.setAnimationLoop(() => {
   } else {
     input.live = false; input.hands = 0; segs.length = 0;
   }
-  theatre.update(dt, segs, input);
+  pauseExit.update(frame);
+  if (!pauseExit.paused) theatre.update(dt, segs, input);   // the story holds still while paused
   if (theatre.draw(now)) wallTex.needsUpdate = true;   // only re-upload the wall when it was repainted
   renderer.render(scene, camera);
 

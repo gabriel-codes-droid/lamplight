@@ -2,13 +2,13 @@
 // ambience (wind and crickets), the chime when a shadow comes alive, and one
 // short sound per creature.
 export function createAudio() {
-  let ctx = null, master = null, ambienceOn = false;
+  let ctx = null, master = null, ambienceOn = false, held = false;
 
   // Call from a user gesture (click, key, entering VR): browsers keep audio silent until then.
   function wake() {
     try {
       ctx = ctx || new AudioContext();
-      ctx.resume();
+      if (!held) ctx.resume();                  // stays silent while the game is paused
       if (!ambienceOn) startAmbience();
     } catch (e) { /* no audio */ }
   }
@@ -98,5 +98,9 @@ export function createAudio() {
     cricket(3900, 11, 0.21, 0.006);
   }
 
-  return { wake, chime, creature };
+  // Pause the game: silence everything until resume() (wake() will not un-mute it meanwhile).
+  function suspend() { held = true; try { if (ctx) ctx.suspend(); } catch (e) { /* no audio */ } }
+  function resume() { held = false; try { if (ctx) ctx.resume(); } catch (e) { /* no audio */ } }
+
+  return { wake, chime, creature, suspend, resume };
 }
